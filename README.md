@@ -16,7 +16,13 @@ day-to-day operation, troubleshooting, safety rules, known issues and the projec
 
 ---
 
-## Screenshots
+## Screenshots & demos
+
+**The RV-2AJ in the simulation / RViz** — the arm driven through a joint sweep in the ROS 2 + MoveIt
+stack running in simulation mode (`./start_robot.sh sim`). The same stack drives the real robot
+over RS-232 when started without `sim`:
+
+![RV-2AJ moving in RViz](docs/images/rviz_sim_motion.gif)
 
 **The operator control panel** (`gui_node.py`, started with `./start_robot.sh`) — live joints,
 TCP pose, Motion (servo / speed / joint step / home), Points & Loop with the per-point
