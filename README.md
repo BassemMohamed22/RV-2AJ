@@ -18,9 +18,14 @@ day-to-day operation, troubleshooting, safety rules, known issues and the projec
 
 ## Screenshots & demos
 
-**The RV-2AJ in the simulation / RViz** — the arm driven through a joint sweep in the ROS 2 + MoveIt
-stack running in simulation mode (`./start_robot.sh sim`). The same stack drives the real robot
-over RS-232 when started without `sim`:
+**The real RV-2AJ running the 44-point assembly** on Station 4 of the Festo MPS 500 line — the
+full taught sequence (per-point speeds and gripper/I/O actions) executed by the robot over RS-232
+(sped up ~19×; the full video runs about 4.5 minutes):
+
+![RV-2AJ real assembly](docs/images/real_robot_assembly.gif)
+
+**The same stack in simulation / RViz** — the arm driven through a joint sweep in the ROS 2 +
+MoveIt stack in simulation mode (`./start_robot.sh sim`); without `sim` it drives the real robot:
 
 ![RV-2AJ moving in RViz](docs/images/rviz_sim_motion.gif)
 
