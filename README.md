@@ -16,6 +16,27 @@ day-to-day operation, troubleshooting, safety rules, known issues and the projec
 
 ---
 
+## Screenshots
+
+**The operator control panel** (`gui_node.py`, started with `./start_robot.sh`) — live joints,
+TCP pose, Motion (servo / speed / joint step / home), Points & Loop with the per-point
+**Slow/Fast** speed buttons, the Gripper card, the full **Station I/O** panel (IN/OUT groups
+including the pneumatics), and the offline Turkish **AI assistant** on the right:
+
+![RV-2AJ control panel](docs/images/gui_control_panel.png)
+
+**DVT Legend 510MR, exposure control over the Ethernet terminal** (`dvt_legend/`) — the camera's
+inspection product was saturating (all-white frames); dropping the exposure over the recovered
+terminal protocol (`#PP 1 E <us>`) brought the sensor back into range. The remaining uniform grey
+is because no lens is fitted — see [`dvt_legend/findings.md`](dvt_legend/findings.md):
+
+![DVT exposure before and after](docs/images/dvt_exposure_before_after.png)
+
+> More images (the live robot and cell, loops running, the cameras in use) are best captured on
+> the hardware — drop them in `docs/images/` and reference them here.
+
+---
+
 ## Contents
 
 1. [Quick start](#1-quick-start)
