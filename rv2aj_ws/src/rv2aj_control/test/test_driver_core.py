@@ -104,40 +104,56 @@ def test_frozen_joint_never_moves(core, monkeypatch):
     assert m.success and abs(core.status().joints["J5"] - j5) < 0.05  # J5 target ignored
 
 
-def test_idle_io_panel_poll_yields_to_a_waiting_job():
-    """Regression (2026-10-20): the Robot IO panel's 4 extra idle-only queries
-    (inputs_8_15, outputs_8_15, hand_inputs, hand_outputs) must back off the
-    moment a real job (the next move, gripper command, speed override, ...) is
-    waiting, instead of running to completion first and stalling it. Observed on
-    the real robot as a ~3-4 s pause before every point in a loop. Single-threaded
-    and deterministic: _poll() is called directly, not through the worker thread,
-    so there is no race on whether the job "happens" to land mid-poll."""
+def test_higher_io_poll_instant_when_idle_rotating_when_busy():
+    """The Robot IO panel's higher bytes (inputs_8_15, outputs_8_15, hand_inputs,
+    hand_outputs):
+      - when the robot has been idle a moment (operator watching): all 4 read every
+        poll, so a sensor change shows at once;
+      - just after a move / mid-loop: ONE per poll, round-robin, so the 4 reads never
+        stall the next move ~0.4 s at each point (2026-10-20/21);
+      - with a job already waiting: skipped, so a queued move is never delayed.
+    Byte 0 (order/ready/busy/error) is read every full poll regardless. Deterministic:
+    _poll() is called directly, not via the worker thread."""
+    import time
     from rv2aj_control.driver_core import DriverCore, Limits
     from rv2aj_control.fake_link import FakeLink
 
+    EXTRA = ("VALM_INB(8)", "VALM_OUTB(8)", "VALM_INB(900)", "VALM_OUTB(900)")
+
     def extra_io_commands(sent):
-        return [c for c in sent if c.startswith(("VALM_INB(8)", "VALM_OUTB(8)", "VALM_INB(900)", "VALM_OUTB(900)"))]
+        return [c for c in sent if c.startswith(EXTRA)]
 
     fake = FakeLink()
     fake.connect("fake")
     c = DriverCore(lambda: fake, Limits())
     c._link = fake
-    c._motion = None  # idle: this is the only condition the extra I/O block runs under
+    c._motion = None
 
-    # Control case: nothing waiting, so the panel poll runs in full as before.
+    # Settled (last move was long ago): all four higher bytes read in one poll.
+    c._last_motion_end = 0.0
     fake.sent.clear()
     assert c._poll(full=True)
-    assert len(extra_io_commands(fake.sent)) == 4, (
-        "sanity check failed: with no pending job all 4 extra I/O queries should still run")
+    assert {cmd.split("=")[0] for cmd in extra_io_commands(fake.sent)} == set(EXTRA), (
+        "when idle, all four higher-I/O bytes should refresh every poll for instant reading")
 
-    # The bug: a job is already queued (as it would be, e.g. the sequencer's next
-    # move) exactly when an idle full poll starts.
+    # Just moved (within the 1 s window, e.g. between loop points): only one per poll,
+    # cycling, so the next move is not delayed by four reads.
+    seen = []
+    for _ in range(4):
+        c._last_motion_end = time.monotonic()   # pretend a move just ended
+        fake.sent.clear()
+        assert c._poll(full=True)
+        got = extra_io_commands(fake.sent)
+        assert len(got) == 1, f"mid-loop should read exactly one higher-I/O byte per poll, got {got}"
+        seen.append(got[0])
+    assert {cmd.split("=")[0] for cmd in seen} >= set(EXTRA), (
+        f"round-robin should still cover all four bytes over four polls, saw {seen}")
+
+    # A job is waiting: skip the higher-I/O read entirely.
+    c._last_motion_end = 0.0
     fake.sent.clear()
     c._jobs.put(("test job", lambda: "ok", None))
     assert c._poll(full=True)
-    left = extra_io_commands(fake.sent)
-    assert left == [], (
-        f"a waiting job must make the Robot IO panel poll back off immediately instead of "
-        f"completing all 4 extra round trips first (got {left}); this is what caused the "
-        f"per-point stall in a loop")
-    c._jobs.get_nowait()  # drain the dummy job so nothing is left over
+    assert extra_io_commands(fake.sent) == [], (
+        "a waiting job must make the higher-I/O read back off so a queued move is not delayed")
+    c._jobs.get_nowait()

@@ -37,9 +37,12 @@
 /rv2aj/sequencer:
   ros__parameters:
     points_file: ~/.ros/rv2aj_points.json
-    # Home pose J1..J6 in degrees (J4 not fitted). Read from the robot 2026-10-16 (operator's new home).
-    home_joints_deg: [-118.49, -101.71, 186.64, 0.00, -127.75, -279.42]
+    # Home pose J1..J6 in degrees (J4 not fitted). Read from the robot 2026-10-21 (operator's
+    # new home near the stations/parts; TCP sensor IN1 watches for a part from this pose).
+    home_joints_deg: [-217.26, -97.21, 219.75, 0.00, -164.49, -350.46]
     home_speed_percent: 40       # Home has no taught speed of its own; used for the slowest-of-two rule
+    auto_input_bit: 1            # auto-run TCP part sensor input (IN1); triggers only when parked at home
+    auto_start_point: P2E        # arm parks here (= home, sensor reads); auto pass starts at the NEXT point, runs to the end, returns home
     gripper_wait_s: 0.6           # pause after a point's gripper command
 
 /rv2aj/ai:
@@ -62,7 +65,7 @@
     # is already outside may only move back toward the range.
     joint_limits_deg: [-720.0, 720.0, -720.0, 720.0, -720.0, 720.0, -720.0, 720.0, -720.0, 720.0]   # limits OFF (operator 2026-10-19)
     # measured: [-327.5, -21.5, -150.0, 0.5, -43.0, 210.0, -272.0, -84.0, -425.0, 335.0]
-    home_joints_deg: [-118.49, -101.71, 186.64, 0.00, -127.75, -279.42]   # fallback; read from the sequencer
+    home_joints_deg: [-217.26, -97.21, 219.75, 0.00, -164.49, -350.46]   # fallback; read from the sequencer
 
 /rv2aj/gui:
   ros__parameters:

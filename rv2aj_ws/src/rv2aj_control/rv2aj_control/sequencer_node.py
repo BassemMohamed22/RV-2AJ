@@ -28,11 +28,20 @@ from std_srvs.srv import Trigger
 
 from rv2aj_interfaces.action import JointMove
 from rv2aj_interfaces.msg import RobotStatus, SequencerStatus, TeachPoint
-from rv2aj_interfaces.srv import LineSignal, PointName, SavePoint, SetOverride, SetPointIO, SetPointSpeed
+from rv2aj_interfaces.srv import (
+    LineSignal,
+    PointName,
+    SavePoint,
+    SetAutoRun,
+    SetOverride,
+    SetPointIO,
+    SetPointSpeed,
+)
 
 MOVABLE = (0, 1, 2, 4, 5)  # J4 is not fitted
 DEFAULT_POINT_SPEED_PERCENT = 20   # points saved before this feature existed get this speed
 VALID_OUTPUTS = tuple(range(16)) + tuple(range(900, 908))  # matches the driver's WRITABLE_OUTPUTS
+AUTO_HOME_TOL_DEG = 10.0   # auto-run trusts the TCP sensor only within this of the home pose
 def _suffixes():
     """A, B, ... Z, then AA, AB, ... ZZ, then AAA ...: letters for inserted points never run out."""
     n = 1
@@ -91,8 +100,22 @@ class SequencerNode(Node):
         # up its speed for the slowest-of-two rule on the NEXT move; "HOME" is valid.
         self.last_reached_point = None
         self.loop_active = False
+        self.single_pass = False    # a running sequence that ends after the last point (does not wrap)
         self.loop_index = 0
         self.cycle = 0
+        # Sensor-triggered auto-run (operator spec 2026-10-21): a TCP-mounted part
+        # sensor on IN<auto_bit>. One full pass runs when the arm is idle AND parked
+        # at home AND the sensor sees a part; readings during a pass are ignored. The
+        # arm returns home after each pass to check for the next part.
+        self.auto_mode = False
+        self.auto_bit = int(self.declare_parameter("auto_input_bit", 1).value)   # IN1 (TCP sensor)
+        # The arm parks at this taught point (= home), where the TCP sensor reads a
+        # part. An auto pass therefore starts at the point AFTER it and runs to the
+        # last point, then returns home — it does not restart from the top.
+        self.auto_start_point = str(self.declare_parameter("auto_start_point", "P2E").value)
+        self.pending_parts = 0       # kept for the status message; the TCP sensor has no queue
+        self._auto_prev = False      # previous "idle & at-home & sensor" state (rising-edge trigger)
+        self._auto_homing = False    # the post-pass return-to-home move is running
 
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.status_pub = self.create_publisher(SequencerStatus, "sequencer/status", latched)
@@ -111,6 +134,7 @@ class SequencerNode(Node):
         self.create_service(SetPointIO, "points/set_io", self._set_io)
         self.create_service(Trigger, "loop/start", self._loop_start)
         self.create_service(Trigger, "loop/stop", self._loop_stop)
+        self.create_service(SetAutoRun, "loop/auto", self._set_auto)
         self.create_service(Trigger, "home/goto", self._goto_home)
         self.get_logger().info(f"{len(self.points)} points loaded from {self.points_file}")
         self._publish()
@@ -162,6 +186,9 @@ class SequencerNode(Node):
         msg.loop_active = self.loop_active
         msg.cycle = self.cycle
         msg.current_point = self.goal_point
+        msg.auto_mode = self.auto_mode
+        msg.pending_parts = self.pending_parts
+        msg.auto_input_bit = self.auto_bit
         self.status_pub.publish(msg)
 
     def _find(self, name):
@@ -172,6 +199,106 @@ class SequencerNode(Node):
 
     def _on_robot(self, msg):
         self.robot = msg
+        self._check_sensor(msg)
+
+    # -- sensor-triggered auto-run --------------------------------------------
+
+    def _near_home(self):
+        """True when every fitted joint is within AUTO_HOME_TOL_DEG of the home pose.
+        The auto-run sensor is on the TCP, so it is only trusted when the arm is
+        actually parked at home (near the parts) — not mid-air during a loop, and
+        not parked somewhere else."""
+        r = self.robot
+        if r is None or len(self.home) != 6:
+            return False
+        for i in MOVABLE:
+            v = r.joints_deg[i]
+            if math.isnan(v) or abs(v - self.home[i]) > AUTO_HOME_TOL_DEG:
+                return False
+        return True
+
+    def _check_sensor(self, msg):
+        """TCP part sensor (IN<auto_bit>): start one pass when the arm is idle AND
+        parked at home AND the sensor sees a part. Readings while a pass is running
+        (the sensor moving near parts/stations, mid-air) are ignored. The trigger is
+        the RISING edge of (idle & at-home & sensor): the arm leaves home during the
+        pass, so this naturally re-arms for the next part when it returns home."""
+        if not self.auto_mode or msg.line_inputs < 0:
+            self._auto_prev = False
+            return
+        sensor = bool((msg.line_inputs >> self.auto_bit) & 1)
+        idle = not self.loop_active and self.goal_handle is None
+        r = self.robot
+        ready = (idle and sensor and self._near_home()
+                 and r is not None and r.connected and r.servo_on)
+        if ready and not self._auto_prev:
+            self.get_logger().warning(f"IN{self.auto_bit}: part detected at home — starting a pass")
+            self._start_auto_pass()
+        self._auto_prev = ready
+
+    def _auto_start_index(self):
+        """Index of the first point an auto pass should run: the one AFTER the
+        taught point the arm parks at (auto_start_point, = home / where the sensor
+        reads). Falls back to 0 if that point is not found or is the last one."""
+        want = self.auto_start_point.strip().lower()
+        for i, p in enumerate(self.points):
+            if str(p.get("name", "")).strip().lower() == want:
+                nxt = i + 1
+                if nxt < len(self.points):
+                    return nxt
+                self.get_logger().warning(
+                    f"auto_start_point '{self.auto_start_point}' is the last point; starting at 0")
+                return 0
+        self.get_logger().warning(
+            f"auto_start_point '{self.auto_start_point}' not found; starting the pass at point 0")
+        return 0
+
+    def _start_auto_pass(self):
+        if self.loop_active or self.goal_handle is not None or not self.points:
+            return
+        start = self._auto_start_index()
+        self.loop_active = True
+        self.single_pass = True
+        self._auto_homing = False
+        self.loop_index = start
+        self.cycle += 1
+        self.get_logger().info(
+            f"auto pass: starting at {self.points[start]['name']} "
+            f"(after {self.auto_start_point}), running to {self.points[-1]['name']}")
+        ok, why = self._send_point(start)
+        if not ok:
+            self._end_loop(why)
+
+    def _set_auto(self, request, response):
+        bit = request.input_bit
+        if bit is not None and bit >= 0:
+            if not 0 <= bit <= 15:
+                response.success, response.message = False, "input bit must be 0-15"
+                return response
+            self.auto_bit = int(bit)
+        if request.enable:
+            if not self.points:
+                response.success, response.message = False, "save at least one point first"
+                return response
+            r = self.robot
+            if r is None or not r.connected or not r.servo_on:
+                response.success, response.message = False, \
+                    "turn the servo on first (auto-run never powers the robot)"
+                return response
+            self.auto_mode = True
+            self._auto_prev = False   # a part already at home now counts as a fresh trigger
+            self._auto_homing = False
+            self.get_logger().warning(
+                f"Auto-run ARMED on IN{self.auto_bit} (TCP sensor): one pass per part when parked at home")
+            response.message = f"auto-run armed on IN{self.auto_bit}"
+        else:
+            self.auto_mode = False
+            self._auto_prev = False
+            self.get_logger().info("Auto-run disarmed")
+            response.message = "auto-run off"
+        self._publish()
+        response.success = True
+        return response
 
     # -- services ---------------------------------------------------------------
 
@@ -342,14 +469,18 @@ class SequencerNode(Node):
         return response
 
     def _loop_stop(self, request, response):
-        was_active = self.loop_active
+        was_active = self.loop_active or self.auto_mode
+        # Stop also DISARMS auto-run and clears the queue: STOP / + must leave the
+        # robot fully stopped, not about to start again when the next part arrives.
+        self.auto_mode = False
+        self.pending_parts = 0
         self._end_loop("loop/stop called")
         if self.goal_handle is _PENDING:
             self.cancel_pending = True
         elif self.goal_handle is not None:
             self.goal_handle.cancel_goal_async()   # driver sends STOP on cancel
         response.success = True
-        response.message = "loop stopped" if was_active else "no loop was running"
+        response.message = "stopped (auto-run disarmed)" if was_active else "nothing was running"
         return response
 
     # -- motion -------------------------------------------------------------------
@@ -537,9 +668,29 @@ class SequencerNode(Node):
         if self.loop_active:
             if not success:
                 self._end_loop(f"move to {name} failed")
+            elif self._auto_homing:
+                # The post-pass return-to-home move just finished: the pass is fully
+                # done, the arm is parked at home. _check_sensor re-arms from here.
+                self._auto_homing = False
+                self._end_loop("pass complete, back at home", ok=True)
             else:
                 self.loop_index += 1
                 if self.loop_index >= len(self.points):
+                    if self.single_pass:
+                        if self.auto_mode:
+                            # Auto pass: send the arm back to home, then wait there for
+                            # the next part (the TCP sensor is only read while at home).
+                            self._auto_homing = True
+                            ok, why = self._send_joints(self.home, "HOME")
+                            if not ok:
+                                self._auto_homing = False
+                                self._end_loop(why)
+                            self._publish()
+                            return
+                        # Manual single pass (not auto): just end after the last point.
+                        self._end_loop("pass complete", ok=True)
+                        self._publish()
+                        return
                     self.loop_index = 0
                     self.cycle += 1
                     self.get_logger().info(f"Cycle {self.cycle}")
@@ -548,10 +699,15 @@ class SequencerNode(Node):
                     self._end_loop(why)
         self._publish()
 
-    def _end_loop(self, reason):
+    def _end_loop(self, reason, ok=False):
         if self.loop_active:
-            self.get_logger().warning(f"Loop ended during cycle {self.cycle}: {reason}")
+            if ok:
+                self.get_logger().info(f"Auto-run: {reason}")
+            else:
+                self.get_logger().warning(f"Sequence ended during cycle {self.cycle}: {reason}")
         self.loop_active = False
+        self.single_pass = False
+        self._auto_homing = False
         self._publish()
 
 

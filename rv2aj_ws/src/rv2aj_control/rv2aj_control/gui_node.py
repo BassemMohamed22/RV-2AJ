@@ -59,6 +59,7 @@ from rv2aj_interfaces.srv import (
     RunProgram,
     SavePoint,
     SetOverride,
+    SetAutoRun,
     SetPointIO,
     SetPointSpeed,
 )
@@ -135,6 +136,7 @@ class RosBridge(QObject):
             "points/goto": n.create_client(PointName, "points/goto"),
             "loop/start": n.create_client(Trigger, "loop/start"),
             "loop/stop": n.create_client(Trigger, "loop/stop"),
+            "loop/auto": n.create_client(SetAutoRun, "loop/auto"),
             "voice/enable": n.create_client(SetBool, "voice/enable"),
             "gripper/open": n.create_client(Trigger, "gripper/open"),
             "home/goto": n.create_client(Trigger, "home/goto"),
@@ -311,12 +313,16 @@ class MainWindow(QMainWindow):
         outer.addWidget(self._build_header())
         outer.addWidget(self._build_body_scroll_area(), 1)
 
-        screen = QApplication.primaryScreen()
-        width = screen.availableGeometry().width() if screen else 1920
-        self.resize(min(1280 + AI_PANEL_WIDTH + 16, width), 920)
+        # Open maximized (fills the screen, keeps the window controls); the body
+        # scroll area ensures everything stays reachable at any size.
         self.setMinimumSize(900, 620)
+        self.resize(1280 + AI_PANEL_WIDTH + 16, 920)   # fallback size if un-maximized
 
         QShortcut(QKeySequence(Qt.Key_Escape), self, activated=self._on_stop,
+                  context=Qt.ApplicationShortcut)
+        # F11 toggles full-screen (the window opens full-screen; this gets the title
+        # bar back and lets the operator move/resize or close the window if needed).
+        QShortcut(QKeySequence(Qt.Key_F11), self, activated=self._toggle_fullscreen,
                   context=Qt.ApplicationShortcut)
         # "+" = emergency stop everywhere (even while typing), hold "S" = push-to-talk.
         self._keys = _HotKeys(self)
@@ -887,8 +893,20 @@ class MainWindow(QMainWindow):
         loop_row.addWidget(self.loop_start_btn, 1)
         loop_row.addWidget(self.loop_end_btn, 1)
         card.body.addLayout(loop_row)
+        # Sensor-triggered auto-run: a TCP part sensor runs one pass per part, only
+        # when the arm is parked at home (readings during a pass are ignored).
+        self.auto_run_btn = QPushButton("▶  Oto-çalışma (TCP sensörü)")
+        self.auto_run_btn.setObjectName("loopStart")
+        self.auto_run_btn.setCheckable(True)
+        self.auto_run_btn.setToolTip("Açıkken: robot EVDE beklerken TCP sensörü parça görünce tüm noktaları "
+                                     "bir kez çalıştırır, sonra eve döner ve sıradaki parçayı bekler. "
+                                     "Hareket sırasındaki (havadaki) okumalar yok sayılır. Servo açık olmalı. "
+                                     "STOP / + oto-çalışmayı kapatır.")
+        self.auto_run_btn.clicked.connect(self._on_auto_run)
+        card.body.addWidget(self.auto_run_btn)
         self.loop_status = QLabel()
         self.loop_status.setObjectName("dim")
+        self.loop_status.setWordWrap(True)
         card.body.addWidget(self.loop_status)
         return card
 
@@ -1296,9 +1314,24 @@ class MainWindow(QMainWindow):
         self.home_btn.setEnabled(ready and "home" not in self.pending)
         self.delete_point_btn.setEnabled(selected and not looping)
         self.clear_points_btn.setEnabled(have_points and not looping)
-        self.loop_start_btn.setEnabled(ready and self.seq is not None and len(self.seq.points) >= 2)
-        self.loop_end_btn.setEnabled(looping)
-        if looping:
+        auto = bool(self.seq and self.seq.auto_mode)
+        pending = self.seq.pending_parts if self.seq else 0
+        auto_bit = self.seq.auto_input_bit if self.seq else 5
+        self.loop_start_btn.setEnabled(ready and self.seq is not None and len(self.seq.points) >= 2 and not auto)
+        self.loop_end_btn.setEnabled(looping and not auto)
+        # Auto-run can only be armed when the servo is on and there is at least one point.
+        self.auto_run_btn.setEnabled((auto or (servo and not looping)) and bool(have_points))
+        if self.auto_run_btn.isChecked() != auto:
+            self.auto_run_btn.setChecked(auto)
+        self.auto_run_btn.setText("■  Oto-çalışmayı durdur" if auto else "▶  Oto-çalışma (TCP sensörü)")
+        if auto:
+            if looping:
+                run = f"parça işleniyor → {self.seq.current_point or '…'}"
+            else:
+                run = "evde parça bekleniyor"
+            q = f" · sırada {pending} parça" if pending else ""
+            self.loop_status.setText(f"Oto-çalışma AÇIK (IN{auto_bit}) · {run}{q}")
+        elif looping:
             self.loop_status.setText(f"Looping · cycle {self.seq.cycle} · moving to {self.seq.current_point or '…'}")
         elif self.seq is None:
             self.loop_status.setText("Sequencer not running.")
@@ -1468,6 +1501,25 @@ class MainWindow(QMainWindow):
         self._goto_confirmed = True
         self._call("loop/start", Trigger.Request(), "start loop")
 
+    def _on_auto_run(self):
+        want_on = self.auto_run_btn.isChecked()
+        armed = bool(self.seq and self.seq.auto_mode)
+        bit = self.seq.auto_input_bit if self.seq else 5
+        if want_on and not armed:
+            n = len(self.seq.points) if self.seq else 0
+            if not self._confirm(
+                "Arm auto-run",
+                f"The robot will start MOVING ON ITS OWN each time a part reaches the IN{bit} sensor — "
+                f"one full pass through all {n} saved points per part, queued if several arrive.\n\n"
+                f"The servo must stay on. Press STOP (or +) to disarm. Clear the area.",
+            ):
+                self.auto_run_btn.setChecked(False)
+                return
+            self._goto_confirmed = True
+            self._call("loop/auto", SetAutoRun.Request(enable=True, input_bit=-1), "arm auto-run")
+        elif not want_on:
+            self._call("loop/auto", SetAutoRun.Request(enable=False, input_bit=-1), "disarm auto-run")
+
     # -- voice --------------------------------------------------------------------
 
     def _on_voice_toggled(self):
@@ -1510,6 +1562,12 @@ class MainWindow(QMainWindow):
             meaning = cmd.kind.replace("_", " ")
         self.voice_heard.setText(f"Heard: “{cmd.text}”  →  {meaning}")
 
+    def _toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
     def closeEvent(self, event):
         self.watchdog.stop()
         self.ai_stop_listener.stop()
@@ -1527,7 +1585,7 @@ def main(args=None):
     app.setStyleSheet(THEME_QSS)
     bridge = RosBridge()
     window = MainWindow(bridge)
-    window.show()
+    window.showFullScreen()   # always open full-screen (F11 toggles the title bar back)
     code = app.exec_()
     bridge.shutdown()
     if rclpy.ok():

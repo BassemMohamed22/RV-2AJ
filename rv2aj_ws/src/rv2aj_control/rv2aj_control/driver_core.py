@@ -164,6 +164,8 @@ class DriverCore:
         self._running = False
         self._jobs = queue.Queue()
         self._motion = None
+        self._io_rotate = 0        # which higher I/O byte to refresh next (round-robin)
+        self._last_motion_end = 0.0  # monotonic time the last move ended (0 = long ago)
         self._status = Status(override_percent=self.limits.default_override)
 
     # -- state -------------------------------------------------------------
@@ -392,6 +394,19 @@ class DriverCore:
                 return False, "sim_order is only available with the simulated controller", -1
             link.line_inputs = (link.line_inputs & 0b00111111) | ((int(value) & 3) << 6)
             return True, f"simulated order bits {int(value) & 3:02b}", self.status().line_outputs
+        if signal.startswith("sim_in") and signal[6:].isdigit():
+            # Simulated controller only: set one input bit (e.g. "sim_in5" for the
+            # auto-run part sensor), so auto-run can be exercised without hardware.
+            if not hasattr(link, "line_inputs"):
+                return False, "sim inputs are only available with the simulated controller", -1
+            bit = int(signal[6:])
+            if not 0 <= bit <= 7:
+                return False, "sim input bit must be 0-7", -1
+            if value:
+                link.line_inputs |= (1 << bit)
+            else:
+                link.line_inputs &= ~(1 << bit)
+            return True, f"sim IN{bit}={1 if value else 0}", self.status().line_outputs
         if signal in ("ready", "busy"):
             if value not in (0, 1):
                 return False, "value must be 0 or 1", -1
@@ -564,6 +579,7 @@ class DriverCore:
         with self._lock:
             if self._motion is motion:
                 self._motion = None
+                self._last_motion_end = time.monotonic()
         if isinstance(error, _Cancelled):
             motion.finish(False, "cancelled before it started")
         else:
@@ -599,6 +615,7 @@ class DriverCore:
         with self._lock:
             if self._motion is motion:
                 self._motion = None
+                self._last_motion_end = time.monotonic()
         unit = " mm" if motion.space == "tool" else "°"
         if timed_out and not reached:
             try:
@@ -685,17 +702,27 @@ class DriverCore:
                 pposf = self._query("PPOSF")
                 line_in = self._query("VALM_INB(0)")
                 line_out = self._query("VALM_OUTB(0)")
-                # The other I/O bytes (Robot IO panel) only while idle, and only if
-                # nothing real is waiting: these are 4 extra round trips on a slow
-                # 9600-baud link, and a move that just finished must not sit behind
-                # them while the sequencer's next move/gripper/override job queues up
-                # right at that same idle moment (observed: ~3-4 s stall per point in
-                # a loop, operator 2026-10-20). One stale cycle just waits for the next.
-                if self._motion is None:
-                    for field, cmd in (("inputs_8_15", "VALM_INB(8)"), ("outputs_8_15", "VALM_OUTB(8)"),
-                                       ("hand_inputs", "VALM_INB(900)"), ("hand_outputs", "VALM_OUTB(900)")):
-                        if not self._jobs.empty():
-                            break
+                # Refresh ONE of the higher I/O bytes per full poll, round-robin, so the
+                # Robot IO panel's IN8-15 / OUT8-15 / hand bytes stay live even during a
+                # loop (they all refresh within a few polls) — without the 4 back-to-back
+                # reads that used to stall the next move by ~0.4 s at each point (operator
+                # 2026-10-20/21). Byte 0 (order / ready / busy / error) is read every full
+                # poll above; these higher bytes are less time-critical. Skipped only when
+                # a real job is already waiting, so a queued move never sits behind a read.
+                IO_BYTES = (("inputs_8_15", "VALM_INB(8)"), ("outputs_8_15", "VALM_OUTB(8)"),
+                            ("hand_inputs", "VALM_INB(900)"), ("hand_outputs", "VALM_OUTB(900)"))
+                settled = self._motion is None and (time.monotonic() - self._last_motion_end) > 1.0
+                if self._jobs.empty():
+                    if settled:
+                        # truly idle (operator watching): read all 4 so IO is instant
+                        for field, cmd in IO_BYTES:
+                            if not self._jobs.empty():
+                                break      # a move was just queued: stop, let it go
+                            extra[field] = self._query(cmd)
+                    else:
+                        # just moved / mid-loop: one per poll so the next move is not delayed
+                        field, cmd = IO_BYTES[self._io_rotate % len(IO_BYTES)]
+                        self._io_rotate += 1
                         extra[field] = self._query(cmd)
             jposf = self._query("JPOSF")
         except SerialLinkError as e:

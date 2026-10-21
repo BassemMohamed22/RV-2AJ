@@ -16,6 +16,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SavePoint.srv"
   "srv/SetPointSpeed.srv"
   "srv/SetPointIO.srv"
+  "srv/SetAutoRun.srv"
   "srv/PointName.srv"
   "srv/LineSignal.srv"
   "action/TcpMove.action"
