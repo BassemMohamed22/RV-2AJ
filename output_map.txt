@@ -1,0 +1,5 @@
+RV-2AJ / CR1-571 general-purpose output map (2026-09-25 10:17)
+Command form: REJECTED on output 0: controller rejected 'EXECM_OUT(0)=1' with reply 'Qer515000000'
+
+Output  Test    Observed
+--------------------------------------------------------------------

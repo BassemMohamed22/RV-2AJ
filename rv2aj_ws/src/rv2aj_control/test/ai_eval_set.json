@@ -1,0 +1,54 @@
+[
+  {"request": "tell me the current position", "expect": [["WHERE"]]},
+  {"request": "what's the tool position", "expect": [["WHERE"]]},
+  {"request": "is everything ok with the robot", "expect": [["STATUS"]]},
+  {"request": "show me the saved positions", "expect": [["LIST_POINTS"]]},
+
+  {"request": "lift the tool by 40 millimetres", "expect": [["MOVE_TCP UP 40"]]},
+  {"request": "drop down 25", "expect": [["MOVE_TCP DOWN 25"]]},
+  {"request": "go 2 cm lower", "expect": [["MOVE_TCP DOWN 20"]]},
+  {"request": "slide left 4 centimetres", "expect": [["MOVE_TCP LEFT 40"]]},
+  {"request": "nudge it to the right", "expect": [["MOVE_TCP RIGHT 10"], ["MOVE_TCP RIGHT 5"]]},
+  {"request": "extend the arm outward 30 mm", "expect": [["MOVE_TCP FORWARD 30"]]},
+  {"request": "retract 15 millimetres", "expect": [["MOVE_TCP BACK 15"]]},
+  {"request": "move away from the base 6 cm", "expect": [["MOVE_TCP FORWARD 60"]]},
+  {"request": "raise it up a tiny bit", "expect": [["MOVE_TCP UP 10"], ["MOVE_TCP UP 5"]]},
+  {"request": "go up 3 cm and forward 2 cm", "expect": [["MOVE_TCP UP 30", "MOVE_TCP FORWARD 20"]]},
+  {"request": "move left 10 then down 10 then right 10", "expect": [["MOVE_TCP LEFT 10", "MOVE_TCP DOWN 10", "MOVE_TCP RIGHT 10"]]},
+
+  {"request": "spin the base 30 degrees", "expect": [["MOVE_JOINT_REL J1 +30"]]},
+  {"request": "rotate the base the other way by 25", "expect": [["MOVE_JOINT_REL J1 -25"]]},
+  {"request": "turn joint 1 by -5 degrees", "expect": [["MOVE_JOINT_REL J1 -5"]]},
+  {"request": "lean the shoulder back 10 degrees", "expect": [["MOVE_JOINT_REL J2 -10"]]},
+  {"request": "open the elbow 15 degrees", "expect": [["MOVE_JOINT_REL J3 -15"], ["MOVE_JOINT_REL J3 +15"]]},
+  {"request": "point the wrist down by 20 degrees", "expect": [["MOVE_JOINT_REL J5 +20"]]},
+  {"request": "tip the wrist upward 10", "expect": [["MOVE_JOINT_REL J5 -10"]]},
+  {"request": "roll the gripper 45 degrees", "expect": [["MOVE_JOINT_REL J6 +45"]]},
+  {"request": "put J3 at 80 degrees", "expect": [["MOVE_JOINT_ABS J3=80"]]},
+  {"request": "set the wrist roll back to zero", "expect": [["MOVE_JOINT_ABS J6=0"]]},
+
+  {"request": "hold the part", "expect": [["GRIPPER CLOSE"]]},
+  {"request": "release it", "expect": [["GRIPPER OPEN"]]},
+  {"request": "open the jaws", "expect": [["GRIPPER OPEN"]]},
+  {"request": "go down 15, close the gripper, then go up 15", "expect": [["MOVE_TCP DOWN 15", "GRIPPER CLOSE", "MOVE_TCP UP 15"], ["MOVE_TCP DOWN 15", "GRIPPER CLOSE", "WAIT 0.5", "MOVE_TCP UP 15"]]},
+
+  {"request": "run at 10 percent", "expect": [["SPEED 10"]]},
+  {"request": "make it faster, 25 percent", "expect": [["SPEED 25"]]},
+
+  {"request": "return to home", "expect": [["GO_HOME"]]},
+  {"request": "move to point one", "expect": [["GOTO_POINT P1"]]},
+  {"request": "go to p3 and open the gripper", "expect": [["GOTO_POINT P3", "GRIPPER OPEN"]]},
+  {"request": "store this pose as drop", "expect": [["SAVE_POINT drop"]]},
+
+  {"request": "do the wave", "expect": [["RUN_SKILL wave"]]},
+  {"request": "wave twice", "expect": [["RUN_SKILL wave", "RUN_SKILL wave"]]},
+  {"request": "learn a skill called shake: twist the gripper 20 degrees and back", "expect": [["DEFINE_SKILL shake: MOVE_JOINT_REL J6 +20 | MOVE_JOINT_REL J6 -20"]]},
+  {"request": "remove the skill named wave", "expect": [["FORGET_SKILL wave"]]},
+
+  {"request": "switch the motors on", "expect": [[]]},
+  {"request": "power off the servo", "expect": [["SERVO_OFF"]]},
+  {"request": "run the belt", "expect": [[]]},
+  {"request": "rotate joint four by 10", "expect": [[]]},
+  {"request": "thanks", "expect": [[]]},
+  {"request": "go", "expect": [[]]}
+]

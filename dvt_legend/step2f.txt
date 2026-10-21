@@ -1,0 +1,9 @@
+$ grep -i "^009068" /usr/share/nmap/nmap-mac-prefixes; grep -i "^00:90:68\|^009068" /usr/share/arp-scan/ieee-oui.txt
+009068 DVT
+/usr/share/arp-scan/ieee-oui.txt:009068	DVT CORP.
+/usr/share/ieee-data/oui.txt:009068     (base 16)		DVT CORP.
+
+$ tcpdump -r boot.pcap -n -e ether host 00:90:68:00:f6:12
+reading from file boot.pcap, link-type EN10MB (Ethernet), snapshot length 262144
+13:13:05.164761 00:90:68:00:f6:12 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 169.254.246.18 tell 169.254.246.18, length 46
+13:13:19.594098 00:90:68:00:f6:12 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 192.168.10.242 tell 192.168.10.242, length 46

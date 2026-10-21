@@ -1,0 +1,40 @@
+$ ip neigh show dev enp2s0
+
+$ nmcli -f GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS device show enp2s0
+GENERAL.STATE:                          70 (connecting (getting IP configuration))
+GENERAL.CONNECTION:                     Wired connection 1
+
+$ nmcli -t -f NAME,UUID,TYPE,DEVICE connection show
+DESKTOP:0f4a6196-f9b8-4d75-808d-4ed0b3775448:802-11-wireless:wlo1
+Wired connection 1:80557a78-8339-340f-ac92-a5064a1b0ced:802-3-ethernet:enp2s0
+lo:6b649158-a1fb-40bf-9026-c7c54ce2b1d8:loopback:lo
+bassem:27b6e826-9978-4d71-bd74-2726d860130b:802-11-wireless:
+bassem 1:7b7b4d7d-f9be-4337-8081-70ec9faf9cfe:802-11-wireless:
+bassem 2:a7d31330-d10a-4fa8-8792-7d3ecb64f334:802-11-wireless:
+eduroam:d1e6d3dd-c1cd-4078-ba3b-b4360dac3467:802-11-wireless:
+ERCIYES-KABLOSUZ:c10ffbaa-01c5-4223-a24a-338524f4e3fe:802-11-wireless:
+Hotspot:7b830fb9-8c1a-4dd4-b752-1cb3e6fe678b:802-11-wireless:
+Infinix NOTE 40 Pro:c3929de8-dae9-4292-9253-5fd7871f677a:802-11-wireless:
+MERCUSYS_590C:54bf8469-ec14-45de-82ed-ba362b231a6f:802-11-wireless:
+POCO F7:00c9a146-2cac-4cf0-836c-12eb215c01bc:802-11-wireless:
+Redmi 13x:29576643-122c-4605-9a16-aba377bd4556:802-11-wireless:
+Robotica:f479f119-af18-4bc2-bf18-7563bf143432:802-11-wireless:
+TurkTelekom_TP34AE_5GHz:e06823e8-1834-43e4-a8e1-a671f4c6b9d7:802-11-wireless:
+yen:932ea4d5-7791-4633-b58e-24da00b63528:802-11-wireless:
+ZekiDuman-DT:dfd73d9b-8fec-4c35-9779-fce352dfd687:802-11-wireless:
+
+$ getcap /usr/bin/tcpdump /usr/bin/dumpcap
+/usr/bin/dumpcap (No such file or directory)
+ls: cannot access '/usr/bin/dumpcap': No such file or directory
+$ ethtool enp2s0 (no root)
+	Speed: 100Mb/s
+	Duplex: Full
+	Link detected: yes
+
+$ ip -6 neigh / ping6 all-nodes link-local
+64 bytes from fe80::f903:845f:b45f:ef58%enp2s0: icmp_seq=2 ttl=64 time=0.043 ms
+64 bytes from fe80::f903:845f:b45f:ef58%enp2s0: icmp_seq=4 ttl=64 time=0.038 ms
+
+--- ff02::1%enp2s0 ping statistics ---
+4 packets transmitted, 3 received, 25% packet loss, time 3070ms
+rtt min/avg/max/mdev = 0.038/0.044/0.052/0.005 ms

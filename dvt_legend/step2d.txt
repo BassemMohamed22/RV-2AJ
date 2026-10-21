@@ -1,0 +1,24 @@
+$ ip -br addr show enp2s0; nmcli -f GENERAL.STATE,GENERAL.CONNECTION device show enp2s0; cat carrier
+enp2s0           UP             
+GENERAL.STATE:                          30 (disconnected)
+GENERAL.CONNECTION:                     --
+carrier=1
+	Speed: 100Mb/s
+	Duplex: Full
+	Link detected: yes
+$ journalctl (NetworkManager, enp2s0, last 5 min)
+Oct 14 14:05:20 bassem NetworkManager[1449]: <info>  [1791975920.1584] device (enp2s0): state change: secondaries -> activated (reason 'none', sys-iface-state: 'managed')
+Oct 14 14:05:20 bassem NetworkManager[1449]: <info>  [1791975920.1587] device (enp2s0): Activation: successful, device activated.
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.3352] audit: op="connection-add" uuid="a5c5251b-6bec-441d-acbe-3442ed0aca2f" name="dvt-probe" pid=12951 uid=1000 result="success"
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.3573] device (enp2s0): Activation: starting connection 'dvt-probe' (a5c5251b-6bec-441d-acbe-3442ed0aca2f)
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.3574] audit: op="connection-activate" uuid="a5c5251b-6bec-441d-acbe-3442ed0aca2f" name="dvt-probe" pid=13103 uid=1000 result="success"
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.3574] device (enp2s0): state change: disconnected -> prepare (reason 'none', sys-iface-state: 'managed')
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.3575] device (enp2s0): state change: prepare -> config (reason 'none', sys-iface-state: 'managed')
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.3579] device (enp2s0): state change: config -> ip-config (reason 'none', sys-iface-state: 'managed')
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.4946] device (enp2s0): state change: ip-config -> ip-check (reason 'none', sys-iface-state: 'managed')
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.5144] device (enp2s0): state change: ip-check -> secondaries (reason 'none', sys-iface-state: 'managed')
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.5145] device (enp2s0): state change: secondaries -> activated (reason 'none', sys-iface-state: 'managed')
+Oct 14 13:03:03 bassem NetworkManager[1449]: <info>  [1791972183.5149] device (enp2s0): Activation: successful, device activated.
+Oct 14 13:03:06 bassem NetworkManager[1449]: <info>  [1791972186.4325] device (enp2s0): state change: activated -> deactivating (reason 'user-requested', sys-iface-state: 'managed')
+Oct 14 13:03:06 bassem NetworkManager[1449]: <info>  [1791972186.4333] audit: op="device-disconnect" interface="enp2s0" ifindex=2 pid=2963 uid=1000 result="success"
+Oct 14 13:03:06 bassem NetworkManager[1449]: <info>  [1791972186.4447] device (enp2s0): state change: deactivating -> disconnected (reason 'user-requested', sys-iface-state: 'managed')

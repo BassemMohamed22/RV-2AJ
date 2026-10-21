@@ -1,0 +1,27 @@
+$ nmcli connection up dvt-probe
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/14)
+$ ip -br addr show enp2s0
+enp2s0           UP             169.254.1.10/16 fe80::e9be:420e:b8ac:a4ee/64 
+
+$ ping -c1 -W1 -I enp2s0 192.168.0.$i for i=2..254 (192.168.0.1 EXCLUDED), parallel
+
+$ ping -b -c3 -W2 -I 169.254.1.10 169.254.255.255
+
+--- 169.254.255.255 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2030ms
+
+
+$ ping -b -c3 -W2 -I enp2s0 255.255.255.255
+
+--- 255.255.255.255 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2054ms
+
+
+$ ip neigh show dev enp2s0 | grep -v FAILED
+(FAILED: 253)
+$ ip -br addr show enp2s0 (still there?)
+enp2s0           UP             169.254.1.10/16 fe80::e9be:420e:b8ac:a4ee/64 
+    RX:  bytes packets errors dropped  missed   mcast           
+     281532823  241461      0       0       0     461 
+    TX:  bytes packets errors dropped carrier collsns           
+      33764305  111064      0      10       0       0 

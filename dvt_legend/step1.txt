@@ -1,0 +1,20 @@
+$ ip -br link
+lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP> 
+enp2s0           UP             bc:ec:a0:1e:2e:fe <BROADCAST,MULTICAST,UP,LOWER_UP> 
+wlo1             UP             b8:1e:a4:44:7e:5d <BROADCAST,MULTICAST,UP,LOWER_UP> 
+
+$ ip -br addr
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+enp2s0           UP             fe80::f903:845f:b45f:ef58/64 
+wlo1             UP             192.168.137.167/24 fe80::99a2:66bf:2a3e:3a2b/64 
+
+enp2s0 carrier=1 speed=100 driver=r8169
+wlo1 carrier=1 speed= driver=rtw89_8852be
+
+$ sudo -n true
+sudo: a password is required
+arp-scan: missing
+tcpdump: /usr/bin/tcpdump
+nmap: missing
+nc: /usr/bin/nc
+ethtool: /usr/sbin/ethtool

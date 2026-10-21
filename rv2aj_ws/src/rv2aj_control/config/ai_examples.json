@@ -1,0 +1,1122 @@
+[
+ {
+  "request": "where is the arm",
+  "say": "Reading the position.",
+  "commands": [
+   "WHERE"
+  ]
+ },
+ {
+  "request": "what are the joint angles right now",
+  "say": "Reading the joint angles.",
+  "commands": [
+   "WHERE"
+  ]
+ },
+ {
+  "request": "is the servo on? any alarm?",
+  "say": "Reading the status.",
+  "commands": [
+   "STATUS"
+  ]
+ },
+ {
+  "request": "which positions do you know",
+  "say": "Listing the saved points.",
+  "commands": [
+   "LIST_POINTS"
+  ]
+ },
+ {
+  "request": "what skills have you learned",
+  "say": "Listing the skills.",
+  "commands": [
+   "LIST_SKILLS"
+  ]
+ },
+ {
+  "request": "move up 20 mm",
+  "say": "Moving the tool up 20 mm.",
+  "commands": [
+   "MOVE_TCP UP 20"
+  ]
+ },
+ {
+  "request": "go down 3 centimeters",
+  "say": "Moving the tool down 30 mm.",
+  "commands": [
+   "MOVE_TCP DOWN 30"
+  ]
+ },
+ {
+  "request": "move a bit to the left",
+  "say": "Moving the tool left 10 mm.",
+  "commands": [
+   "MOVE_TCP LEFT 10"
+  ]
+ },
+ {
+  "request": "shift right by 15",
+  "say": "Moving the tool right 15 mm.",
+  "commands": [
+   "MOVE_TCP RIGHT 15"
+  ]
+ },
+ {
+  "request": "reach forward 5 cm",
+  "say": "Moving the tool forward 50 mm.",
+  "commands": [
+   "MOVE_TCP FORWARD 50"
+  ]
+ },
+ {
+  "request": "pull back a little",
+  "say": "Moving the tool back 10 mm.",
+  "commands": [
+   "MOVE_TCP BACK 10"
+  ]
+ },
+ {
+  "request": "raise the gripper 10 cm",
+  "say": "Moving the tool up 100 mm.",
+  "commands": [
+   "MOVE_TCP UP 100"
+  ]
+ },
+ {
+  "request": "lower it slightly",
+  "say": "Moving the tool down 10 mm.",
+  "commands": [
+   "MOVE_TCP DOWN 10"
+  ]
+ },
+ {
+  "request": "go up a lot",
+  "say": "Moving the tool up 50 mm.",
+  "commands": [
+   "MOVE_TCP UP 50"
+  ]
+ },
+ {
+  "request": "move up 20 then left 30",
+  "say": "Up 20 mm, then left 30 mm.",
+  "commands": [
+   "MOVE_TCP UP 20",
+   "MOVE_TCP LEFT 30"
+  ]
+ },
+ {
+  "request": "come closer to the base by 2 cm and go down 1 cm",
+  "say": "Back 20 mm, then down 10 mm.",
+  "commands": [
+   "MOVE_TCP BACK 20",
+   "MOVE_TCP DOWN 10"
+  ]
+ },
+ {
+  "request": "rotate the base 20 degrees",
+  "say": "Turning J1 by +20 degrees.",
+  "commands": [
+   "MOVE_JOINT_REL J1 +20"
+  ]
+ },
+ {
+  "request": "turn the base back 15 degrees",
+  "say": "Turning J1 by -15 degrees.",
+  "commands": [
+   "MOVE_JOINT_REL J1 -15"
+  ]
+ },
+ {
+  "request": "turn joint one minus 10",
+  "say": "Turning J1 by -10 degrees.",
+  "commands": [
+   "MOVE_JOINT_REL J1 -10"
+  ]
+ },
+ {
+  "request": "move the shoulder forward 5 degrees",
+  "say": "Turning J2 by +5 degrees.",
+  "commands": [
+   "MOVE_JOINT_REL J2 +5"
+  ]
+ },
+ {
+  "request": "bend the elbow 10 degrees less",
+  "say": "Turning J3 by -10 degrees.",
+  "commands": [
+   "MOVE_JOINT_REL J3 -10"
+  ]
+ },
+ {
+  "request": "tilt the wrist down 15 degrees",
+  "say": "Tilting the wrist down 15 degrees.",
+  "commands": [
+   "TILT_WRIST DOWN 15"
+  ]
+ },
+ {
+  "request": "tilt the wrist up a bit",
+  "say": "Tilting the wrist up 5 degrees.",
+  "commands": [
+   "TILT_WRIST UP 5"
+  ]
+ },
+ {
+  "request": "twist the gripper 90 degrees",
+  "say": "Turning J6 by +90 degrees.",
+  "commands": [
+   "MOVE_JOINT_REL J6 +90"
+  ]
+ },
+ {
+  "request": "rotate the wrist minus 45",
+  "say": "Turning J6 by -45 degrees.",
+  "commands": [
+   "MOVE_JOINT_REL J6 -45"
+  ]
+ },
+ {
+  "request": "put joint 2 at 10 degrees",
+  "say": "Moving J2 to 10 degrees.",
+  "commands": [
+   "MOVE_JOINT_ABS J2=10"
+  ]
+ },
+ {
+  "request": "set the base angle to -120 and the wrist roll to 0",
+  "say": "Moving J1 to -120 and J6 to 0 degrees.",
+  "commands": [
+   "MOVE_JOINT_ABS J1=-120 J6=0"
+  ]
+ },
+ {
+  "request": "straighten the wrist roll",
+  "say": "Moving J6 to 0 degrees.",
+  "commands": [
+   "MOVE_JOINT_ABS J6=0"
+  ]
+ },
+ {
+  "request": "open the gripper",
+  "say": "Opening the gripper.",
+  "commands": [
+   "GRIPPER OPEN"
+  ]
+ },
+ {
+  "request": "grab it",
+  "say": "Closing the gripper.",
+  "commands": [
+   "GRIPPER CLOSE"
+  ]
+ },
+ {
+  "request": "let go of the part",
+  "say": "Opening the gripper.",
+  "commands": [
+   "GRIPPER OPEN"
+  ]
+ },
+ {
+  "request": "close the jaws",
+  "say": "Closing the gripper.",
+  "commands": [
+   "GRIPPER CLOSE"
+  ]
+ },
+ {
+  "request": "go down 20, grip, and come back up",
+  "say": "Down 20 mm, close the gripper, up 20 mm.",
+  "commands": [
+   "MOVE_TCP DOWN 20",
+   "GRIPPER CLOSE",
+   "WAIT 0.5",
+   "MOVE_TCP UP 20"
+  ]
+ },
+ {
+  "request": "lower 3 cm and release",
+  "say": "Down 30 mm, then open the gripper.",
+  "commands": [
+   "MOVE_TCP DOWN 30",
+   "GRIPPER OPEN"
+  ]
+ },
+ {
+  "request": "slow down to 5 percent",
+  "say": "Speed 5 percent.",
+  "commands": [
+   "SPEED 5"
+  ]
+ },
+ {
+  "request": "use 20 percent speed",
+  "say": "Speed 20 percent.",
+  "commands": [
+   "SPEED 20"
+  ]
+ },
+ {
+  "request": "go full speed",
+  "say": "The AI allows at most 30 percent, setting 30.",
+  "commands": [
+   "SPEED 30"
+  ]
+ },
+ {
+  "request": "go home",
+  "say": "Moving to the home position.",
+  "commands": [
+   "GO_HOME"
+  ]
+ },
+ {
+  "request": "back to the start position",
+  "say": "Moving to the home position.",
+  "commands": [
+   "GO_HOME"
+  ]
+ },
+ {
+  "request": "go to point 2",
+  "say": "Moving to P2.",
+  "commands": [
+   "GOTO_POINT P2"
+  ]
+ },
+ {
+  "request": "move to P1 then P3",
+  "say": "Moving to P1, then P3.",
+  "commands": [
+   "GOTO_POINT P1",
+   "GOTO_POINT P3"
+  ]
+ },
+ {
+  "request": "go to the pick position",
+  "say": "Moving to pick.",
+  "commands": [
+   "GOTO_POINT pick"
+  ]
+ },
+ {
+  "request": "remember this position as pick",
+  "say": "Saving this position as pick.",
+  "commands": [
+   "SAVE_POINT pick"
+  ]
+ },
+ {
+  "request": "save here as place",
+  "say": "Saving this position as place.",
+  "commands": [
+   "SAVE_POINT place"
+  ]
+ },
+ {
+  "request": "learn a skill called wave: turn the wrist 30 degrees one way then 60 the other then back",
+  "say": "Learning the skill wave.",
+  "commands": [
+   "DEFINE_SKILL wave: MOVE_JOINT_REL J6 +30 | MOVE_JOINT_REL J6 -60 | MOVE_JOINT_REL J6 +30"
+  ]
+ },
+ {
+  "request": "when I say nod, tilt the wrist down 10 degrees and back up",
+  "say": "Learning the skill nod.",
+  "commands": [
+   "DEFINE_SKILL nod: TILT_WRIST DOWN 10 | TILT_WRIST UP 10"
+  ]
+ },
+ {
+  "request": "teach a skill pickup: go down 20, close the gripper, wait half a second, go up 20",
+  "say": "Learning the skill pickup.",
+  "commands": [
+   "DEFINE_SKILL pickup: MOVE_TCP DOWN 20 | GRIPPER CLOSE | WAIT 0.5 | MOVE_TCP UP 20"
+  ]
+ },
+ {
+  "request": "wave",
+  "say": "Doing the wave skill.",
+  "commands": [
+   "RUN_SKILL wave"
+  ]
+ },
+ {
+  "request": "do the pickup skill then go home",
+  "say": "Running pickup, then going home.",
+  "commands": [
+   "RUN_SKILL pickup",
+   "GO_HOME"
+  ]
+ },
+ {
+  "request": "forget the wave skill",
+  "say": "Forgetting wave.",
+  "commands": [
+   "FORGET_SKILL wave"
+  ]
+ },
+ {
+  "request": "turn the servo on",
+  "say": "I cannot turn the servo on. Please press Servo ON in the GUI.",
+  "commands": []
+ },
+ {
+  "request": "servo off",
+  "say": "Turning the servo off.",
+  "commands": [
+   "SERVO_OFF"
+  ]
+ },
+ {
+  "request": "start the conveyor",
+  "say": "The conveyor is not controlled by the robot.",
+  "commands": []
+ },
+ {
+  "request": "move joint 4",
+  "say": "This robot has no J4.",
+  "commands": []
+ },
+ {
+  "request": "how are you",
+  "say": "Ready. Tell me where the arm should go.",
+  "commands": []
+ },
+ {
+  "request": "move",
+  "say": "Hangi yöne ve ne kadar gideyim? Örneğin: “2 santim sola git”.",
+  "commands": []
+ },
+ {
+  "request": "retract the arm 2 cm",
+  "say": "Moving the tool back 20 mm.",
+  "commands": [
+   "MOVE_TCP BACK 20"
+  ]
+ },
+ {
+  "request": "extend outward 25 mm",
+  "say": "Moving the tool forward 25 mm.",
+  "commands": [
+   "MOVE_TCP FORWARD 25"
+  ]
+ },
+ {
+  "request": "move the tool toward the base",
+  "say": "Moving the tool back 10 mm.",
+  "commands": [
+   "MOVE_TCP BACK 10"
+  ]
+ },
+ {
+  "request": "point the wrist up 20 degrees",
+  "say": "Tilting the wrist up 20 degrees.",
+  "commands": [
+   "TILT_WRIST UP 20"
+  ]
+ },
+ {
+  "request": "run at 15 percent",
+  "say": "Speed 15 percent.",
+  "commands": [
+   "SPEED 15"
+  ]
+ },
+ {
+  "request": "is the gripper open?",
+  "say": "Reading the status.",
+  "commands": [
+   "STATUS"
+  ]
+ },
+ {
+  "request": "open the gripper even if it is open",
+  "say": "Opening the gripper.",
+  "commands": [
+   "GRIPPER OPEN"
+  ]
+ },
+ {
+  "request": "how high is the tool",
+  "say": "Reading the position.",
+  "commands": [
+   "WHERE"
+  ]
+ },
+ {
+  "request": "record the current pose as bin",
+  "say": "Saving this position as bin.",
+  "commands": [
+   "SAVE_POINT bin"
+  ]
+ },
+ {
+  "request": "nod twice",
+  "say": "Doing nod twice.",
+  "commands": [
+   "RUN_SKILL nod",
+   "RUN_SKILL nod"
+  ]
+ },
+ {
+  "request": "aim the gripper downward 30 degrees",
+  "say": "Tilting the wrist down 30 degrees.",
+  "commands": [
+   "TILT_WRIST DOWN 30"
+  ]
+ },
+ {
+  "request": "pick up the part",
+  "say": "Closing the gripper.",
+  "commands": [
+   "GRIPPER CLOSE"
+  ]
+ },
+ {
+  "request": "set the elbow at 70 degrees",
+  "say": "Moving J3 to 70 degrees.",
+  "commands": [
+   "MOVE_JOINT_ABS J3=70"
+  ]
+ },
+ {
+  "request": "turn the elbow by 12 degrees",
+  "say": "Turning J3 by +12 degrees.",
+  "commands": [
+   "MOVE_JOINT_REL J3 +12"
+  ]
+ },
+ {
+  "request": "lower the gripper angle 10 degrees",
+  "say": "Tilting the wrist down 10 degrees.",
+  "commands": [
+   "TILT_WRIST DOWN 10"
+  ]
+ },
+ {
+  "request": "left 5, back 5",
+  "say": "Left 5 mm, then back 5 mm.",
+  "commands": [
+   "MOVE_TCP LEFT 5",
+   "MOVE_TCP BACK 5"
+  ]
+ },
+ {
+  "request": "robot nerede",
+  "say": "Konumu okuyorum.",
+  "commands": [
+   "WHERE"
+  ]
+ },
+ {
+  "request": "eklem açılarını söyle",
+  "say": "Eklem açılarını okuyorum.",
+  "commands": [
+   "WHERE"
+  ]
+ },
+ {
+  "request": "durum nedir, alarm var mı",
+  "say": "Durumu okuyorum.",
+  "commands": [
+   "STATUS"
+  ]
+ },
+ {
+  "request": "kayıtlı noktaları listele",
+  "say": "Kayıtlı noktaları listeliyorum.",
+  "commands": [
+   "LIST_POINTS"
+  ]
+ },
+ {
+  "request": "hangi becerileri biliyorsun",
+  "say": "Becerileri listeliyorum.",
+  "commands": [
+   "LIST_SKILLS"
+  ]
+ },
+ {
+  "request": "20 milimetre yukarı çık",
+  "say": "Aracı 20 milimetre yukarı kaldırıyorum.",
+  "commands": [
+   "MOVE_TCP UP 20"
+  ]
+ },
+ {
+  "request": "3 santim aşağı in",
+  "say": "Aracı 30 milimetre indiriyorum.",
+  "commands": [
+   "MOVE_TCP DOWN 30"
+  ]
+ },
+ {
+  "request": "biraz sola git",
+  "say": "Aracı 10 milimetre sola götürüyorum.",
+  "commands": [
+   "MOVE_TCP LEFT 10"
+  ]
+ },
+ {
+  "request": "15 milim sağa kay",
+  "say": "Aracı 15 milimetre sağa götürüyorum.",
+  "commands": [
+   "MOVE_TCP RIGHT 15"
+  ]
+ },
+ {
+  "request": "5 santim ileri uzan",
+  "say": "Aracı 50 milimetre ileri götürüyorum.",
+  "commands": [
+   "MOVE_TCP FORWARD 50"
+  ]
+ },
+ {
+  "request": "biraz geri çekil",
+  "say": "Aracı 10 milimetre geri çekiyorum.",
+  "commands": [
+   "MOVE_TCP BACK 10"
+  ]
+ },
+ {
+  "request": "yukarı 2 santim sonra sola 3 santim",
+  "say": "Önce 20 milimetre yukarı, sonra 30 milimetre sola.",
+  "commands": [
+   "MOVE_TCP UP 20",
+   "MOVE_TCP LEFT 30"
+  ]
+ },
+ {
+  "request": "tabanı 25 derece döndür",
+  "say": "Tabanı 25 derece döndürüyorum.",
+  "commands": [
+   "MOVE_JOINT_REL J1 +25"
+  ]
+ },
+ {
+  "request": "tabanı ters yönde 10 derece çevir",
+  "say": "Tabanı -10 derece döndürüyorum.",
+  "commands": [
+   "MOVE_JOINT_REL J1 -10"
+  ]
+ },
+ {
+  "request": "omzu 5 derece ileri al",
+  "say": "Omzu 5 derece hareket ettiriyorum.",
+  "commands": [
+   "MOVE_JOINT_REL J2 +5"
+  ]
+ },
+ {
+  "request": "dirseği 10 derece azalt",
+  "say": "Dirseği -10 derece hareket ettiriyorum.",
+  "commands": [
+   "MOVE_JOINT_REL J3 -10"
+  ]
+ },
+ {
+  "request": "bileği 15 derece aşağı eğ",
+  "say": "Bileği 15 derece aşağı eğiyorum.",
+  "commands": [
+   "TILT_WRIST DOWN 15"
+  ]
+ },
+ {
+  "request": "bileği biraz yukarı kaldır",
+  "say": "Bileği 5 derece yukarı eğiyorum.",
+  "commands": [
+   "TILT_WRIST UP 5"
+  ]
+ },
+ {
+  "request": "tutucuyu 90 derece döndür",
+  "say": "Bileği 90 derece döndürüyorum.",
+  "commands": [
+   "MOVE_JOINT_REL J6 +90"
+  ]
+ },
+ {
+  "request": "ikinci eklemi 10 dereceye getir",
+  "say": "J2'yi 10 dereceye getiriyorum.",
+  "commands": [
+   "MOVE_JOINT_ABS J2=10"
+  ]
+ },
+ {
+  "request": "tutucuyu aç",
+  "say": "Tutucuyu açıyorum.",
+  "commands": [
+   "GRIPPER OPEN"
+  ]
+ },
+ {
+  "request": "parçayı tut",
+  "say": "Tutucuyu kapatıyorum.",
+  "commands": [
+   "GRIPPER CLOSE"
+  ]
+ },
+ {
+  "request": "parçayı bırak",
+  "say": "Tutucuyu açıyorum.",
+  "commands": [
+   "GRIPPER OPEN"
+  ]
+ },
+ {
+  "request": "2 santim in, parçayı kavra, sonra 2 santim kalk",
+  "say": "İnip parçayı tutuyorum, sonra kalkıyorum.",
+  "commands": [
+   "MOVE_TCP DOWN 20",
+   "GRIPPER CLOSE",
+   "WAIT 0.5",
+   "MOVE_TCP UP 20"
+  ]
+ },
+ {
+  "request": "hızı yüzde 15 yap",
+  "say": "Hızı yüzde 15 yapıyorum.",
+  "commands": [
+   "SPEED 15"
+  ]
+ },
+ {
+  "request": "yavaşla, yüzde 5",
+  "say": "Hızı yüzde 5 yapıyorum.",
+  "commands": [
+   "SPEED 5"
+  ]
+ },
+ {
+  "request": "eve dön",
+  "say": "Başlangıç konumuna gidiyorum.",
+  "commands": [
+   "GO_HOME"
+  ]
+ },
+ {
+  "request": "2 numaralı noktaya git",
+  "say": "P2 noktasına gidiyorum.",
+  "commands": [
+   "GOTO_POINT P2"
+  ]
+ },
+ {
+  "request": "bu konumu kutu olarak kaydet",
+  "say": "Bu konumu kutu olarak kaydediyorum.",
+  "commands": [
+   "SAVE_POINT kutu"
+  ]
+ },
+ {
+  "request": "selam adında bir beceri öğren: bileği 30 derece döndür sonra geri 30 derece döndür",
+  "say": "selam becerisini öğreniyorum.",
+  "commands": [
+   "DEFINE_SKILL selam: MOVE_JOINT_REL J6 +30 | MOVE_JOINT_REL J6 -30"
+  ]
+ },
+ {
+  "request": "selam becerisini yap",
+  "say": "selam becerisini yapıyorum.",
+  "commands": [
+   "RUN_SKILL selam"
+  ]
+ },
+ {
+  "request": "servoyu aç",
+  "say": "Servoyu açamam. Lütfen arayüzdeki Servo ON düğmesine basın.",
+  "commands": []
+ },
+ {
+  "request": "servoyu kapat",
+  "say": "Servoyu kapatıyorum.",
+  "commands": [
+   "SERVO_OFF"
+  ]
+ },
+ {
+  "request": "konveyörü çalıştır",
+  "say": "Konveyör robot tarafından kontrol edilmiyor.",
+  "commands": []
+ },
+ {
+  "request": "merhaba",
+  "say": "Merhaba hocam! Nasılsın? Bugün kolla ne yapalım?",
+  "commands": []
+ },
+ {
+  "request": "sola git",
+  "say": "20 milimetre sola gidiyorum.",
+  "commands": [
+   "MOVE_TCP LEFT 20"
+  ]
+ },
+ {
+  "request": "sağa kay",
+  "say": "20 milimetre sağa gidiyorum.",
+  "commands": [
+   "MOVE_TCP RIGHT 20"
+  ]
+ },
+ {
+  "request": "yukarı çık",
+  "say": "20 milimetre yukarı çıkıyorum.",
+  "commands": [
+   "MOVE_TCP UP 20"
+  ]
+ },
+ {
+  "request": "aşağı in",
+  "say": "20 milimetre iniyorum.",
+  "commands": [
+   "MOVE_TCP DOWN 20"
+  ]
+ },
+ {
+  "request": "ileri git",
+  "say": "20 milimetre ileri gidiyorum.",
+  "commands": [
+   "MOVE_TCP FORWARD 20"
+  ]
+ },
+ {
+  "request": "geri gel",
+  "say": "20 milimetre geri geliyorum.",
+  "commands": [
+   "MOVE_TCP BACK 20"
+  ]
+ },
+ {
+  "request": "tabanı döndür",
+  "say": "Tabanı 10 derece döndürüyorum.",
+  "commands": [
+   "MOVE_JOINT_REL J1 +10"
+  ]
+ },
+ {
+  "request": "bileği aşağı eğ",
+  "say": "Bileği 10 derece aşağı eğiyorum.",
+  "commands": [
+   "TILT_WRIST DOWN 10"
+  ]
+ },
+ {
+  "request": "10 santim sola git",
+  "say": "100 milimetre sola gidiyorum; sınır varsa sınırda durur.",
+  "commands": [
+   "MOVE_TCP LEFT 100"
+  ]
+ },
+ {
+  "request": "sonuna kadar yukarı çık",
+  "say": "Gidebildiğim kadar yukarı çıkıyorum.",
+  "commands": [
+   "MOVE_TCP UP 200"
+  ]
+ },
+ {
+  "request": "5 santimlik bir kare çiz",
+  "say": "5 santim kenarlı bir kare çiziyorum.",
+  "commands": [
+   "DRAW_SQUARE 50"
+  ]
+ },
+ {
+  "request": "kenarı 8 santim olan dikey bir kare çiz",
+  "say": "8 santim kenarlı dikey bir kare çiziyorum.",
+  "commands": [
+   "DRAW_SQUARE 80 VERTICAL"
+  ]
+ },
+ {
+  "request": "bir kare çiz",
+  "say": "5 santim kenarlı bir kare çiziyorum.",
+  "commands": [
+   "DRAW_SQUARE 50"
+  ]
+ },
+ {
+  "request": "10 santime 5 santim dikdörtgen çiz",
+  "say": "10 x 5 santim dikdörtgen çiziyorum.",
+  "commands": [
+   "DRAW_RECTANGLE 100 50"
+  ]
+ },
+ {
+  "request": "6 santim çaplı bir daire çiz",
+  "say": "6 santim çaplı bir daire çiziyorum.",
+  "commands": [
+   "DRAW_CIRCLE 60"
+  ]
+ },
+ {
+  "request": "yarıçapı 4 santim olan bir çember çiz",
+  "say": "8 santim çaplı bir daire çiziyorum.",
+  "commands": [
+   "DRAW_CIRCLE 80"
+  ]
+ },
+ {
+  "request": "havada dikey bir daire çiz",
+  "say": "5 santim çaplı dikey bir daire çiziyorum.",
+  "commands": [
+   "DRAW_CIRCLE 50 VERTICAL"
+  ]
+ },
+ {
+  "request": "küçük bir yuvarlak yap",
+  "say": "5 santim çaplı bir daire çiziyorum.",
+  "commands": [
+   "DRAW_CIRCLE 50"
+  ]
+ },
+ {
+  "request": "5 santim yarıçaplı yarım daire çiz",
+  "say": "5 santim yarıçaplı yarım daire çiziyorum.",
+  "commands": [
+   "DRAW_ARC 50 180 LEFT"
+  ]
+ },
+ {
+  "request": "sağa doğru çeyrek daire çiz",
+  "say": "Sağa doğru çeyrek daire çiziyorum.",
+  "commands": [
+   "DRAW_ARC 50 90 RIGHT"
+  ]
+ },
+ {
+  "request": "yarıçapı 3 santim olan 120 derecelik bir yay çiz",
+  "say": "120 derecelik bir yay çiziyorum.",
+  "commands": [
+   "DRAW_ARC 30 120 LEFT"
+  ]
+ },
+ {
+  "request": "draw a 4 cm square",
+  "say": "4 santim kenarlı bir kare çiziyorum.",
+  "commands": [
+   "DRAW_SQUARE 40"
+  ]
+ },
+ {
+  "request": "draw a circle with a 5 cm radius",
+  "say": "10 santim çaplı bir daire çiziyorum.",
+  "commands": [
+   "DRAW_CIRCLE 100"
+  ]
+ },
+ {
+  "request": "make a half circle",
+  "say": "5 santim yarıçaplı yarım daire çiziyorum.",
+  "commands": [
+   "DRAW_ARC 50 180 LEFT"
+  ]
+ },
+ {
+  "request": "draw a vertical circle 6 cm across",
+  "say": "6 santim çaplı dikey bir daire çiziyorum.",
+  "commands": [
+   "DRAW_CIRCLE 60 VERTICAL"
+  ]
+ },
+ {
+  "request": "sağa doğru yarım bir yay çiz",
+  "say": "Sağa doğru yarım daire çiziyorum.",
+  "commands": [
+   "DRAW_ARC 50 180 RIGHT"
+  ]
+ },
+ {
+  "request": "draw a quarter circle to the left",
+  "say": "Sola doğru çeyrek daire çiziyorum.",
+  "commands": [
+   "DRAW_ARC 50 90 LEFT"
+  ]
+ },
+ {
+  "request": "kare çiz sonra 3 santim sola git",
+  "say": "Kare çiziyorum, sonra 3 santim sola gidiyorum.",
+  "commands": [
+   "DRAW_SQUARE 50",
+   "MOVE_TCP LEFT 30"
+  ]
+ },
+ {
+  "request": "merhaba nasılsın",
+  "say": "Merhaba hocam! İyiyim, teşekkür ederim. Bugün kolla ne yapalım?",
+  "commands": []
+ },
+ {
+  "request": "ne yapabilirsin",
+  "say": "Aracı her yöne hareket ettirebilir, eklemleri döndürebilir, tutucuyu açıp kapatabilir, kare ve daire çizebilir, konum kaydedip yeni beceriler öğrenebilirim.",
+  "commands": []
+ },
+ {
+  "request": "günaydın, kolu biraz yukarı kaldırır mısın",
+  "say": "Günaydın hocam! Tabii.",
+  "commands": [
+   "MOVE_TCP UP 10"
+  ]
+ },
+ {
+  "request": "bugün biraz yorgunum, yavaş çalışalım, hızı yüzde 10 yap",
+  "say": "Geçmiş olsun, yavaş ve dikkatli gidelim.",
+  "commands": [
+   "SPEED 10"
+  ]
+ },
+ {
+  "request": "teşekkürler, harikaydı",
+  "say": "Rica ederim hocam! Başka bir şey yapalım mı?",
+  "commands": []
+ },
+ {
+  "request": "bu robotun kaç ekseni var",
+  "say": "Beş ekseni var: taban, omuz, dirsek, bilek eğimi ve bilek dönüşü. Dördüncü eksen yok.",
+  "commands": []
+ },
+ {
+  "request": "tutucu ne kadar güçlü",
+  "say": "Festo HGP-16 tutucu 160 newtona kadar sıkabilir, parmaklarınızı uzak tutun.",
+  "commands": []
+ },
+ {
+  "request": "bana bir şaka yap",
+  "say": "Robotlar neden hiç yorulmaz? Çünkü her zaman şarjları dolu ve kolları sağlam!",
+  "commands": []
+ },
+ {
+  "request": "hmm biraz sola kaysan iyi olur",
+  "say": "Tamam hocam.",
+  "commands": [
+   "MOVE_TCP LEFT 10"
+  ]
+ },
+ {
+  "request": "şimdi neredesin acaba",
+  "say": "Hemen bakıyorum hocam.",
+  "commands": [
+   "WHERE"
+  ]
+ },
+ {
+  "request": "neden sola gidemedin",
+  "say": "Az önce dirsek eklemi (J3) sınırına dayandığı için sola gidemedim. Önce tabanı biraz döndürürsek yer açılabilir.",
+  "commands": []
+ },
+ {
+  "request": "sence ne yapalım",
+  "say": "İstersen küçük bir kare çizebilirim ya da parçayı alıp bırakabiliriz. Sen söyle!",
+  "commands": []
+ },
+ {
+  "request": "tamam güzel, şimdi bir daire çiz ve sonra eve dön",
+  "say": "Olur hocam!",
+  "commands": [
+   "DRAW_CIRCLE 50",
+   "GO_HOME"
+  ]
+ },
+ {
+  "request": "hello, can you open the gripper please",
+  "say": "Tabii hocam!",
+  "commands": [
+   "GRIPPER OPEN"
+  ]
+ },
+ {
+  "request": "what can you do",
+  "say": "Kolu hareket ettirebilir, tutucuyu kullanabilir, şekil çizebilir ve yeni beceriler öğrenebilirim.",
+  "commands": []
+ },
+ {
+  "request": "biraz dinlenelim",
+  "say": "Tabii, dinlenelim. Hazır olunca söylemen yeterli.",
+  "commands": []
+ },
+ {
+  "request": "bu kol ne işe yarıyor",
+  "say": "Parçaları alıp taşımak, montaj yapmak ve istasyonla birlikte çalışmak için kullanılan beş eksenli bir robot kolu.",
+  "commands": []
+ },
+ {
+  "request": "bir daire çiz, sonra mola verelim",
+  "say": "Olur, daireden sonra mola!",
+  "commands": [
+   "DRAW_CIRCLE 50"
+  ]
+ },
+ {
+  "request": "sipariş var mı",
+  "say": "Hemen bakıyorum hocam.",
+  "commands": [
+   "LINE_STATUS"
+  ]
+ },
+ {
+  "request": "istasyondan ne istiyorlar",
+  "say": "Hattı kontrol ediyorum hocam.",
+  "commands": [
+   "LINE_STATUS"
+  ]
+ },
+ {
+  "request": "istasyona hazır olduğumuzu söyle",
+  "say": "Tabii hocam.",
+  "commands": [
+   "LINE_READY ON"
+  ]
+ },
+ {
+  "request": "hazır sinyalini kapat",
+  "say": "Tamam hocam.",
+  "commands": [
+   "LINE_READY OFF"
+  ]
+ },
+ {
+  "request": "siparişe başladık, meşgul yap",
+  "say": "Tamam hocam.",
+  "commands": [
+   "LINE_BUSY ON"
+  ]
+ },
+ {
+  "request": "iş bitti, meşgulü kapat ve hazır ver",
+  "say": "Tamam hocam.",
+  "commands": [
+   "LINE_BUSY OFF",
+   "LINE_READY ON"
+  ]
+ },
+ {
+  "request": "istasyona hata kodu 2 gönder",
+  "say": "Tamam hocam.",
+  "commands": [
+   "LINE_ERROR_CODE 2"
+  ]
+ },
+ {
+  "request": "hatayı temizle",
+  "say": "Tamam hocam.",
+  "commands": [
+   "LINE_ERROR_CODE 0"
+  ]
+ },
+ {
+  "request": "is there an order from the line",
+  "say": "Hemen bakıyorum hocam.",
+  "commands": [
+   "LINE_STATUS"
+  ]
+ },
+ {
+  "request": "tell the station we are ready",
+  "say": "Tabii hocam.",
+  "commands": [
+   "LINE_READY ON"
+  ]
+ }
+]

@@ -1,0 +1,11 @@
+PyQt5>=5.15
+pyserial>=3.5
+SpeechRecognition>=3.10
+PyAudio>=0.2.13
+
+# AI control (optional; the rest of the GUI works without these)
+faster-whisper>=1.0      # offline speech-to-text on CPU
+sounddevice>=0.4         # push-to-talk recording
+numpy
+requests                 # talks to the local Ollama server
+# pyttsx3                # optional TTS; otherwise spd-say (speech-dispatcher) is used

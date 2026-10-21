@@ -1,0 +1,371 @@
+"""Teach points and loop playback, on top of a joint_move action: the
+planner's planned/joint_move (MoveIt-validated, default) or the driver's.
+
+Services: points/save, points/delete, points/clear, points/goto,
+          loop/start, loop/stop, home/goto (home_joints_deg)
+Topic:    sequencer/status (latched: points, loop state)
+
+Points are stored as JSON ([{"name": "P1", "joints": [J1..J6 deg]}]),
+the same format as the standalone GUI's points.json.
+The loop moves P1 -> P2 -> ... -> P1 ... until loop/stop, and ends by itself
+if any move fails or is stopped (driver STOP aborts the active goal).
+"""
+
+import json
+import math
+import os
+import shutil
+import time
+
+import rclpy
+from rclpy.action import ActionClient
+from rclpy.executors import ExternalShutdownException
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
+from std_srvs.srv import Trigger
+
+from rv2aj_interfaces.action import JointMove
+from rv2aj_interfaces.msg import RobotStatus, SequencerStatus, TeachPoint
+from rv2aj_interfaces.srv import PointName, SavePoint
+
+MOVABLE = (0, 1, 2, 4, 5)  # J4 is not fitted
+_PENDING = object()  # goal sent, not yet accepted (goal handles override ==, so compare with is)
+
+
+class SequencerNode(Node):
+    def __init__(self):
+        super().__init__("sequencer")
+        path = self.declare_parameter("points_file", "~/.ros/rv2aj_points.json").value
+        joint_action = self.declare_parameter("joint_action", "planned/joint_move").value
+        self.gripper_wait_s = float(self.declare_parameter("gripper_wait_s", 0.6).value)
+        self.home = [float(v) for v in self.declare_parameter(
+            "home_joints_deg", [-118.49, -101.71, 186.64, 0.00, -127.75, -279.42]).value]
+        self.points_file = os.path.expanduser(path)
+        self.points = self._load()
+        self.robot = None
+        self.goal_handle = None     # None, _PENDING or a ClientGoalHandle
+        self.cancel_pending = False
+        self.goal_point = ""
+        self.loop_active = False
+        self.loop_index = 0
+        self.cycle = 0
+
+        latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.status_pub = self.create_publisher(SequencerStatus, "sequencer/status", latched)
+        self.create_subscription(RobotStatus, "status", self._on_robot, 10)
+        self.move_client = ActionClient(self, JointMove, joint_action)
+        self.grip_clients = {"open": self.create_client(Trigger, "gripper/open"),
+                             "closed": self.create_client(Trigger, "gripper/close")}
+
+        self.create_service(SavePoint, "points/save", self._save)
+        self.create_service(PointName, "points/delete", self._delete)
+        self.create_service(Trigger, "points/clear", self._clear)
+        self.create_service(PointName, "points/goto", self._goto)
+        self.create_service(Trigger, "loop/start", self._loop_start)
+        self.create_service(Trigger, "loop/stop", self._loop_stop)
+        self.create_service(Trigger, "home/goto", self._goto_home)
+        self.get_logger().info(f"{len(self.points)} points loaded from {self.points_file}")
+        self._publish()
+
+    # -- storage -------------------------------------------------------------
+
+    def _load(self):
+        try:
+            with open(self.points_file) as f:
+                data = json.load(f)
+            return [{"name": str(p["name"]), "joints": [float(v) for v in p["joints"][:6]],
+                     "gripper": p.get("gripper") if p.get("gripper") in ("open", "closed") else None}
+                    for p in data if len(p.get("joints", [])) >= 6]
+        except FileNotFoundError:
+            return []
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            self.get_logger().error(f"Could not read {self.points_file}: {e}")
+            return []
+
+    def _persist(self):
+        os.makedirs(os.path.dirname(self.points_file) or ".", exist_ok=True)
+        # Points are kept always: the file being replaced is first copied to
+        # <name>_history/<name>_<time>.json, never deleted (operator's choice
+        # 2026-10-19). Delete / Clear / an unreadable file stay recoverable.
+        if os.path.exists(self.points_file):
+            stem = os.path.splitext(self.points_file)[0]
+            history = stem + "_history"
+            os.makedirs(history, exist_ok=True)
+            stamp = time.strftime("%Y-%m-%d_%H%M%S") + f"_{time.time_ns() % 1_000_000_000:09d}"
+            shutil.copy2(self.points_file, os.path.join(history, f"{os.path.basename(stem)}_{stamp}.json"))
+        tmp = self.points_file + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(self.points, f, indent=2)
+        os.replace(tmp, self.points_file)
+
+    def _publish(self):
+        msg = SequencerStatus()
+        for p in self.points:
+            tp = TeachPoint()
+            tp.name = p["name"]
+            tp.joints_deg = [float(v) for v in p["joints"]]
+            tp.gripper = p.get("gripper") or ""
+            msg.points.append(tp)
+        msg.loop_active = self.loop_active
+        msg.cycle = self.cycle
+        msg.current_point = self.goal_point
+        self.status_pub.publish(msg)
+
+    def _find(self, name):
+        name = name.strip().upper()
+        return next((i for i, p in enumerate(self.points) if p["name"].upper() == name), None)
+
+    # -- robot status ---------------------------------------------------------
+
+    def _on_robot(self, msg):
+        self.robot = msg
+
+    # -- services ---------------------------------------------------------------
+
+    def _save(self, request, response):
+        r = self.robot
+        if r is None or not r.connected:
+            response.success, response.message = False, "robot not connected"
+            return response
+        if r.moving or self.loop_active:
+            response.success, response.message = False, "wait until the robot has stopped"
+            return response
+        if any(math.isnan(r.joints_deg[i]) for i in MOVABLE):
+            response.success, response.message = False, "joint angles not known yet"
+            return response
+        name = request.name.strip().upper()
+        after = request.after.strip().upper()
+        insert_at = None
+        if after:
+            ai = self._find(after)
+            if ai is None:
+                response.success, response.message = False, f"no point named {after}"
+                return response
+            insert_at = ai + 1
+            if name and self._find(name) is not None:
+                response.success, response.message = False, f"{name} already exists"
+                return response
+            if not name:
+                # P1 -> P1A, P1B ...; inserting after P1A also continues P1's letters.
+                stem = after.rstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ") if after[1:].rstrip(
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ").isdigit() else after
+                letter = next(c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if self._find(stem + c) is None)
+                name = stem + letter
+        if not name:
+            used = [int(p["name"][1:]) for p in self.points if p["name"][1:].isdigit()]
+            name = f"P{max(used, default=0) + 1}"
+        joints = [0.0 if i not in MOVABLE else round(r.joints_deg[i], 2) for i in range(6)]
+        # The gripper's last commanded state is saved with the point and re-applied
+        # after the robot reaches it (unknown = leave the gripper alone).
+        gripper = r.gripper if r.gripper in ("open", "closed") else None
+        index = self._find(name)
+        if insert_at is not None:
+            self.points.insert(insert_at, {"name": name, "joints": joints, "gripper": gripper})
+        elif index is None:
+            self.points.append({"name": name, "joints": joints, "gripper": gripper})
+        else:
+            self.points[index]["joints"] = joints
+            self.points[index]["gripper"] = gripper
+        self._persist()
+        self._publish()
+        self.get_logger().info(f"Saved {name}: " + ", ".join(f"J{i + 1} {joints[i]:.2f}" for i in MOVABLE)
+                               + f", gripper {gripper or 'unchanged'}")
+        where = f" after {after}" if insert_at is not None else ""
+        response.success, response.message, response.name = True, f"saved {name}{where}", name
+        return response
+
+    def _delete(self, request, response):
+        index = self._find(request.name)
+        if index is None:
+            response.success, response.message = False, f"no point named {request.name!r}"
+        elif self.loop_active:
+            response.success, response.message = False, "stop the loop first"
+        else:
+            removed = self.points.pop(index)
+            self._persist()
+            self._publish()
+            self.get_logger().info(f"Deleted {removed['name']}")
+            response.success, response.message = True, f"deleted {removed['name']}"
+        return response
+
+    def _clear(self, request, response):
+        if self.loop_active:
+            response.success, response.message = False, "stop the loop first"
+            return response
+        count = len(self.points)
+        self.points = []
+        self._persist()
+        self._publish()
+        self.get_logger().info(f"Cleared {count} points")
+        response.success, response.message = True, f"cleared {count} points"
+        return response
+
+    def _goto(self, request, response):
+        index = self._find(request.name)
+        if index is None:
+            response.success, response.message = False, f"no point named {request.name!r}"
+        elif self.loop_active:
+            response.success, response.message = False, "a loop is running"
+        else:
+            response.success, response.message = self._send_point(index)
+        return response
+
+    def _goto_home(self, request, response):
+        if self.loop_active:
+            response.success, response.message = False, "a loop is running"
+        elif len(self.home) != 6:
+            response.success, response.message = False, "home_joints_deg must have 6 values"
+        else:
+            response.success, response.message = self._send_joints(self.home, "HOME")
+        return response
+
+    def _loop_start(self, request, response):
+        if self.loop_active:
+            response.success, response.message = False, "loop already running"
+        elif len(self.points) < 2:
+            response.success, response.message = False, "save at least 2 points first"
+        else:
+            self.loop_active = True
+            self.loop_index = 0
+            self.cycle = 1
+            ok, message = self._send_point(0)
+            if not ok:
+                self._end_loop(message)
+            else:
+                names = " → ".join(p["name"] for p in self.points)
+                self.get_logger().warning(f"Loop started: {names}")
+            response.success, response.message = ok, message
+        return response
+
+    def _loop_stop(self, request, response):
+        was_active = self.loop_active
+        self._end_loop("loop/stop called")
+        if self.goal_handle is _PENDING:
+            self.cancel_pending = True
+        elif self.goal_handle is not None:
+            self.goal_handle.cancel_goal_async()   # driver sends STOP on cancel
+        response.success = True
+        response.message = "loop stopped" if was_active else "no loop was running"
+        return response
+
+    # -- motion -------------------------------------------------------------------
+
+    def _send_point(self, index):
+        point = self.points[index]
+        return self._send_joints(point["joints"], point["name"])
+
+    def _send_joints(self, joints, name):
+        if self.goal_handle is not None:
+            return False, "a move is already in progress"
+        if not self.move_client.server_is_ready():
+            return False, f"{self.move_client._action_name} not available (is the stack running?)"
+        goal = JointMove.Goal()
+        goal.relative = False
+        goal.target_deg = [float(v) for v in joints]
+        self.goal_point = name
+        self._publish()
+        self.get_logger().info(f"Moving to {name}")
+        future = self.move_client.send_goal_async(goal)
+        self.goal_handle = _PENDING
+        self.cancel_pending = False
+        future.add_done_callback(self._goal_response)
+        return True, f"moving to {name}"
+
+    def _goal_response(self, future):
+        handle = future.result()
+        if handle is None or not handle.accepted:
+            self.goal_handle = None
+            self._move_finished(False, "goal rejected")
+            return
+        self.goal_handle = handle
+        if self.cancel_pending:
+            self.cancel_pending = False
+            handle.cancel_goal_async()
+        handle.get_result_async().add_done_callback(self._goal_result)
+
+    def _goal_result(self, future):
+        result = future.result().result
+        self.goal_handle = None
+        self._move_finished(result.success, result.message)
+
+    def _move_finished(self, success, message):
+        name = self.goal_point
+        self.goal_point = ""
+        if success:
+            self.get_logger().info(f"Reached {name}")
+            index = self._find(name)
+            grip = self.points[index].get("gripper") if index is not None else None
+            if grip:
+                self._actuate_gripper(grip, name)
+                self._publish()
+                return
+        else:
+            self.get_logger().warning(f"Move to {name} failed: {message}")
+        self._after_point(success, name)
+
+    def _actuate_gripper(self, grip, name):
+        client = self.grip_clients[grip]
+        if not client.service_is_ready():
+            self.get_logger().error(f"{name}: gripper service not available")
+            self._after_point(False, name)
+            return
+        self.get_logger().info(f"{name}: gripper {grip}")
+
+        def done(future):
+            response = future.result()
+            ok = response is not None and response.success
+            if not ok:
+                self.get_logger().warning(f"{name}: gripper {grip} failed: "
+                                          f"{response.message if response else 'no response'}")
+            # Give the pneumatic jaws time to finish before the next move.
+            self._after_delay(self.gripper_wait_s, lambda: self._after_point(ok, name))
+
+        client.call_async(Trigger.Request()).add_done_callback(done)
+
+    def _after_delay(self, seconds, fn):
+        timer = None
+
+        def fire():
+            timer.cancel()
+            self.destroy_timer(timer)
+            fn()
+
+        timer = self.create_timer(seconds, fire)
+
+    def _after_point(self, success, name):
+        if self.loop_active:
+            if not success:
+                self._end_loop(f"move to {name} failed")
+            else:
+                self.loop_index += 1
+                if self.loop_index >= len(self.points):
+                    self.loop_index = 0
+                    self.cycle += 1
+                    self.get_logger().info(f"Cycle {self.cycle}")
+                ok, why = self._send_point(self.loop_index)
+                if not ok:
+                    self._end_loop(why)
+        self._publish()
+
+    def _end_loop(self, reason):
+        if self.loop_active:
+            self.get_logger().warning(f"Loop ended during cycle {self.cycle}: {reason}")
+        self.loop_active = False
+        self._publish()
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = SequencerNode()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

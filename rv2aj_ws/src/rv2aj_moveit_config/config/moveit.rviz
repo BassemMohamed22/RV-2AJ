@@ -1,0 +1,73 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Cell Size: 0.1
+      Plane Cell Count: 20
+      Enabled: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot (live)
+      Enabled: true
+      Description Topic:
+        Value: /robot_description
+    - Class: rviz_default_plugins/InteractiveMarkers
+      Name: TCP jog (drag an arrow, release to move)
+      Enabled: false
+      Interactive Markers Namespace: /rv2aj/jog
+      Show Axes: false
+      Show Descriptions: true
+    - Class: rviz_default_plugins/Marker
+      Name: AI path preview
+      Enabled: true
+      Topic:
+        Value: /rv2aj/ai/path_preview
+        Depth: 5
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+    - Class: moveit_rviz_plugin/MotionPlanning
+      Name: MotionPlanning
+      Enabled: true
+      Move Group Namespace: ""
+      Robot Description: robot_description
+      Planning Request:
+        Planning Group: arm
+        Interactive Marker Size: 0.2
+        Query Goal State: true
+        Query Start State: false
+      Planned Path:
+        Loop Animation: false
+        Show Robot Visual: true
+        Show Trail: false
+        State Display Time: 0.05 s
+        Trajectory Topic: /display_planned_path
+      Scene Robot:
+        Show Robot Visual: false
+        Show Robot Collision: false
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+  Global Options:
+    Fixed Frame: world
+    Background Color: 238; 241; 246
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.6
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.3
+      Pitch: 0.35
+      # Look from the operator's side: the robot faces the operator at home (J1 = -130 deg).
+      Yaw: -2.275
+Window Geometry:
+  Width: 1400
+  Height: 900

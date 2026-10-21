@@ -1,0 +1,5 @@
+greeting: b'System Terminal Driver\r\n?'
+sent b'help\r\n' -> 3 bytes:
+b'\r\n!'
+
+!

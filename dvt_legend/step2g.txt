@@ -1,0 +1,15 @@
+$ nmcli connection modify dvt-probe ipv4.addresses "169.254.1.10/16,192.168.10.10/24" ipv4.routes "" connection.autoconnect yes connection.autoconnect-priority 10
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/21)
+enp2s0           UP             169.254.1.10/16 192.168.10.10/24 fe80::e9be:420e:b8ac:a4ee/64 
+
+$ ping -c3 -W1 192.168.10.242
+--- 192.168.10.242 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2032ms
+rtt min/avg/max/mdev = 0.300/0.366/0.473/0.076 ms
+$ ping -c3 -W1 169.254.246.18
+--- 169.254.246.18 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2045ms
+
+$ ip neigh show dev enp2s0
+192.168.10.242 lladdr 00:90:68:00:f6:12 REACHABLE 
+169.254.246.18 INCOMPLETE 

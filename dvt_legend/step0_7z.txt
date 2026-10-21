@@ -1,0 +1,17 @@
+$ 7z x InstallFWK280.EXE
+
+7-Zip 23.01 (x64) : Copyright (c) 1999-2023 Igor Pavlov : 2023-06-20
+ 64-bit locale=en_US.UTF-8 Threads:12 OPEN_MAX:1048576
+
+Scanning the drive for archives:
+1 file, 33458558 bytes (32 MiB)
+
+Extracting archive: ../installer_extract/InstallFWK280.EXE
+ERROR: ../installer_extract/InstallFWK280.EXE
+Cannot open the file as archive
+
+
+Can't open as archive: 1
+Files: 0
+Size:       0
+Compressed: 0

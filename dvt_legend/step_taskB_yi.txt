@@ -1,0 +1,2 @@
+banner: b'System Terminal Driver\r\n?'
+sent b'#YI\r\n' -> b'\r\n% 1 \r\n!'

@@ -1,0 +1,10 @@
+$ nmcli connection add type ethernet con-name dvt-probe ifname enp2s0 ipv4.method manual ipv4.addresses 169.254.1.10/16 ipv4.routes "192.168.0.0/24" ipv4.never-default yes ipv6.method link-local connection.autoconnect no
+Connection 'dvt-probe' (a5c5251b-6bec-441d-acbe-3442ed0aca2f) successfully added.
+$ nmcli connection up dvt-probe
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/13)
+$ ip -br addr show enp2s0
+enp2s0           UP             169.254.1.10/16 fe80::e9be:420e:b8ac:a4ee/64 
+$ ip route show dev enp2s0
+169.254.0.0/16 proto kernel scope link src 169.254.1.10 metric 100 
+192.168.0.0/24 proto static scope link metric 100 
+$ ip neigh show dev enp2s0

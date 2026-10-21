@@ -1,0 +1,3 @@
+2026-09-26 14:11:49.014  TEXT_INPUT       {"text": "move the robot up"}
+2026-09-26 14:11:50.094  LLM_OUTPUT       {"model": "qwen2.5:3b", "raw": "{\"say\": \"The robot is not connected. Please connect the robot first before attempting any movements.\", \"commands\": []}"}
+2026-09-26 14:11:50.095  VALIDATOR        {"source": "llm", "ok": false, "reason": "no commands", "say": "The robot is not connected. Please connect the robot first before attempting any movements."}

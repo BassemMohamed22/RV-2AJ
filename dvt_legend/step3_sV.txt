@@ -1,0 +1,82 @@
+$ nmap -Pn -sT -sV --version-intensity 5 -p 502,3246,3247,4883,5000,5001,7500 192.168.10.242
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2026-10-14 13:17 +03
+Nmap scan report for 192.168.10.242
+Host is up (0.0013s latency).
+
+PORT     STATE SERVICE        VERSION
+502/tcp  open  mbap?
+3246/tcp open  dvt-system?
+3247/tcp open  dvt-data?
+4883/tcp open  wmlserver?
+5000/tcp open  upnp?
+5001/tcp open  commplex-link?
+7500/tcp open  silhouette?
+5 services unrecognized despite returning data. If you know the service/version, please submit the following fingerprints at https://nmap.org/cgi-bin/submit.cgi?new-service :
+==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============
+SF-Port3246-TCP:V=7.94SVN%I=5%D=10/14%Time=6ACF56CE%P=x86_64-pc-linux-gnu%
+SF:r(NULL,19,"System\x20Terminal\x20Driver\r\n\?")%r(GenericLines,1F,"Syst
+SF:em\x20Terminal\x20Driver\r\n\?\r\n\?\r\n\?")%r(GetRequest,19,"System\x2
+SF:0Terminal\x20Driver\r\n\?")%r(HTTPOptions,19,"System\x20Terminal\x20Dri
+SF:ver\r\n\?")%r(RTSPRequest,19,"System\x20Terminal\x20Driver\r\n\?")%r(RP
+SF:CCheck,19,"System\x20Terminal\x20Driver\r\n\?")%r(DNSVersionBindReqTCP,
+SF:19,"System\x20Terminal\x20Driver\r\n\?")%r(Help,19,"System\x20Terminal\
+SF:x20Driver\r\n\?")%r(SSLSessionReq,19,"System\x20Terminal\x20Driver\r\n\
+SF:?")%r(TLSSessionReq,19,"System\x20Terminal\x20Driver\r\n\?")%r(Kerberos
+SF:,19,"System\x20Terminal\x20Driver\r\n\?")%r(SMBProgNeg,19,"System\x20Te
+SF:rminal\x20Driver\r\n\?")%r(X11Probe,19,"System\x20Terminal\x20Driver\r\
+SF:n\?")%r(SIPOptions,19,"System\x20Terminal\x20Driver\r\n\?");
+==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============
+SF-Port3247-TCP:V=7.94SVN%I=5%D=10/14%Time=6ACF56E7%P=x86_64-pc-linux-gnu%
+SF:r(RPCCheck,3,"1\r\n")%r(Help,1B,"1\r\n1\r\n1\r\n1\r\n1\r\n1\r\n1\r\n1\r
+SF:\n1\r\n")%r(SSLSessionReq,C,"1\r\n1\r\n1\r\n1\r\n")%r(TLSSessionReq,C,"
+SF:1\r\n1\r\n1\r\n1\r\n")%r(Kerberos,C,"1\r\n1\r\n1\r\n1\r\n")%r(SMBProgNe
+SF:g,F,"1\r\n1\r\n1\r\n1\r\n1\r\n")%r(X11Probe,F,"1\r\n1\r\n1\r\n1\r\n1\r\
+SF:n")%r(SIPOptions,18,"1\r\n1\r\n1\r\n1\r\n1\r\n1\r\n1\r\n1\r\n");
+==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============
+SF-Port5000-TCP:V=7.94SVN%I=5%D=10/14%Time=6ACF56CE%P=x86_64-pc-linux-gnu%
+SF:r(NULL,19,"System\x20Terminal\x20Driver\r\n\?")%r(GenericLines,1F,"Syst
+SF:em\x20Terminal\x20Driver\r\n\?\r\n\?\r\n\?")%r(GetRequest,19,"System\x2
+SF:0Terminal\x20Driver\r\n\?")%r(RTSPRequest,19,"System\x20Terminal\x20Dri
+SF:ver\r\n\?")%r(DNSVersionBindReqTCP,19,"System\x20Terminal\x20Driver\r\n
+SF:\?")%r(SMBProgNeg,19,"System\x20Terminal\x20Driver\r\n\?")%r(ZendJavaBr
+SF:idge,19,"System\x20Terminal\x20Driver\r\n\?")%r(HTTPOptions,19,"System\
+SF:x20Terminal\x20Driver\r\n\?")%r(RPCCheck,19,"System\x20Terminal\x20Driv
+SF:er\r\n\?")%r(Help,19,"System\x20Terminal\x20Driver\r\n\?")%r(SSLSession
+SF:Req,19,"System\x20Terminal\x20Driver\r\n\?")%r(TLSSessionReq,19,"System
+SF:\x20Terminal\x20Driver\r\n\?")%r(Kerberos,19,"System\x20Terminal\x20Dri
+SF:ver\r\n\?")%r(X11Probe,19,"System\x20Terminal\x20Driver\r\n\?")%r(SIPOp
+SF:tions,19,"System\x20Terminal\x20Driver\r\n\?");
+==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============
+SF-Port5001-TCP:V=7.94SVN%I=5%D=10/14%Time=6ACF56E7%P=x86_64-pc-linux-gnu%
+SF:r(HTTPOptions,3,"1\r\n")%r(RPCCheck,12,"1\r\n1\r\n1\r\n1\r\n1\r\n1\r\n"
+SF:)%r(DNSVersionBindReqTCP,F,"1\r\n1\r\n1\r\n1\r\n1\r\n")%r(Help,15,"1\r\
+SF:n1\r\n1\r\n1\r\n1\r\n1\r\n1\r\n")%r(SSLSessionReq,C,"1\r\n1\r\n1\r\n1\r
+SF:\n")%r(TLSSessionReq,F,"1\r\n1\r\n1\r\n1\r\n1\r\n")%r(Kerberos,F,"1\r\n
+SF:1\r\n1\r\n1\r\n1\r\n")%r(SMBProgNeg,F,"1\r\n1\r\n1\r\n1\r\n1\r\n")%r(X1
+SF:1Probe,F,"1\r\n1\r\n1\r\n1\r\n1\r\n")%r(SIPOptions,18,"1\r\n1\r\n1\r\n1
+SF:\r\n1\r\n1\r\n1\r\n1\r\n");
+==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============
+SF-Port7500-TCP:V=7.94SVN%I=5%D=10/14%Time=6ACF56E7%P=x86_64-pc-linux-gnu%
+SF:r(SSLSessionReq,40,"\x04\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+SF:0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0")%r(SIPOptions,240,"\x04\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+SF:0\0\0\0\0\0\0\0\0\x04\0\x01\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+SF:0\0\0\0\x04\0\x02\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x0
+SF:4\0\x03\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x04\0\x04\0\
+SF:0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x04\0\x05\0\0\0\0\0\0\
+SF:0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x04\0\x06\0\0\0\0\0\0\0\0\0\0\0\
+SF:0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x04\0\x07\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+SF:0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0\0\0\0\0\0\x04\0\x08\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+SF:0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+SF:\0\0\0\0");
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 86.29 seconds

@@ -1,0 +1,69 @@
+# Parameters for the RV-2AJ stack (all nodes run in the /rv2aj namespace).
+/rv2aj/driver:
+  ros__parameters:
+    port: /dev/ttyUSB0
+    auto_connect: true            # connecting only starts the read-only poll
+    default_override_percent: 10  # applied on every connect; never remembered higher
+    max_tcp_move_mm: 50.0
+    max_joint_step_deg: 45.0
+    joint_poll_interval_s: 0.03   # JPOSF every cycle (~0.1 s per query at 9600 baud)
+    poll_interval_s: 1.0          # STATE + PPOSF when idle
+    moving_poll_interval_s: 0.5   # STATE + PPOSF while moving
+    frame_id: rv2aj_base
+
+/rv2aj/voice:
+  ros__parameters:
+    device_index: -1              # -1 = default microphone; indices are logged at startup
+    language: en-US
+    start_enabled: false
+    phrase_time_limit_s: 4.0
+    calibration_s: 1.5
+
+/rv2aj/planner:
+  ros__parameters:
+    check_step_deg: 1.0           # MoveIt checks the joint path at least every 1 deg
+    line_step_mm: 5.0             # IK sample spacing along straight TCP moves
+    line_tolerance_mm: 1.0        # max deviation from the straight line between waypoints
+    max_tcp_move_mm: 50.0
+    max_joint_step_deg: 45.0
+    planning_time_s: 5.0
+
+/rv2aj/translator:
+  ros__parameters:
+    require_keyword: true         # phrases must contain "move"/"go"
+    default_distance_mm: 5.0
+    max_distance_mm: 50.0
+
+/rv2aj/sequencer:
+  ros__parameters:
+    points_file: ~/.ros/rv2aj_points.json
+    # Home pose J1..J6 in degrees (J4 not fitted). Read from the robot 2026-10-16 (operator's new home).
+    home_joints_deg: [-118.49, -101.71, 186.64, 0.00, -127.75, -279.42]
+    gripper_wait_s: 0.6           # pause after a point's gripper command
+
+/rv2aj/ai:
+  ros__parameters:
+    model: rv2aj-qwen               # fine-tuned Qwen3-4B-Instruct (finetune/): 96% vs 71.5% for qwen3:4b (removed 2026-10-01; no fallback installed)
+    ollama_url: http://127.0.0.1:11434
+    k_examples: 8                 # closest taught examples shown to the model per request
+    confirm_mode: guesses        # guesses: clear commands run at once, only guesses ask "Onaylıyor musunuz?" | all: every motion asks
+    plan_ttl_s: 120.0             # a proposed plan must be confirmed within this time
+    speak: true                   # say responses out loud
+    tts: piper                    # piper: offline voice (operator chose the community Turkish voice, 2026-09-27) | edge: Microsoft Ahmet (online) | spd-say | none
+    voice_tr: ~/.local/share/piper-voices/tr_TR-community-medium.onnx   # other Turkish voices removed 2026-10-01
+    voice_en: ~/.local/share/piper-voices/en_US-lessac-medium.onnx
+    language: tr                  # tr: always Turkish (operator's choice); en; or auto
+    voice_style: plain            # plain: the voice as is (operator's choice); light: subtle room/presence
+    sounds: true                  # interface sounds (startup, confirm, done, error, stop)
+    memory_file: ~/.ros/rv2aj_ai_memory.json   # learned examples and skills
+    log_file: ~/.ros/rv2aj_ai_log.txt
+    # Joint limits the AI enforces (J1 lo, hi, J2 lo, hi, J3, J5, J6). A joint that
+    # is already outside may only move back toward the range.
+    joint_limits_deg: [-327.5, -21.5, -150.0, 0.5, -43.0, 210.0, -272.0, -84.0, -425.0, 335.0]   # measured on the robot 2026-09-28 (joint_limits.yaml)
+    home_joints_deg: [-118.49, -101.71, 186.64, 0.00, -127.75, -279.42]   # fallback; read from the sequencer
+
+/rv2aj/gui:
+  ros__parameters:
+    whisper_model: small          # speech-to-text: small is much better for Turkish than base (~2 s per phrase)
+    whisper_language: tr          # tr, en, or "" to auto-detect
+    stop_listener: true           # always-on offline "dur" listener (Vosk) as an extra stop layer

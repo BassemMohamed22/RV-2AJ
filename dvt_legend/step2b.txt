@@ -1,0 +1,12 @@
+$ for i in 2..254 (192.168.0.1 EXCLUDED): ping -c1 -W1 -I enp2s0 192.168.0.$i (parallel)
+
+$ ping -b -c3 -W2 -I enp2s0 169.254.255.255
+ping: Warning: source address might be selected on device other than: enp2s0
+PING 169.254.255.255 (169.254.255.255) from 192.168.137.167 enp2s0: 56(84) bytes of data.
+
+--- 169.254.255.255 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2026ms
+
+
+$ ip neigh show dev enp2s0 | grep -v FAILED
+(FAILED entries: 254)

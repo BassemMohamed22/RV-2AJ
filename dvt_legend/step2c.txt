@@ -1,0 +1,15 @@
+$ ping -b -c3 -W2 -I 169.254.1.10 169.254.255.255
+ping: bind: Cannot assign requested address
+
+$ ip -s link show enp2s0  (t=0)
+    RX:  bytes packets errors dropped  missed   mcast           
+     281532823  241461      0       0       0     461 
+    TX:  bytes packets errors dropped carrier collsns           
+      33728175  110273      0      10       0       0 
+$ ip -s link show enp2s0  (t=30 s)
+    RX:  bytes packets errors dropped  missed   mcast           
+     281532823  241461      0       0       0     461 
+    TX:  bytes packets errors dropped carrier collsns           
+      33728175  110273      0      10       0       0 
+
+$ ip neigh show dev enp2s0 | grep -v FAILED
