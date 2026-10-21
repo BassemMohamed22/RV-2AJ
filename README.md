@@ -535,6 +535,39 @@ not possible over serial (section 4.3). The validator mirrors, repositions or sc
 **Speed**: the driver sends the override with every move (default 10 %, the AI may use up to 30 %).
 The controller's own override reads 100 %; programs run from the pendant would use that.
 
+### 7.1 Teach-and-repeat playback: per-point speed, per-point I/O, and inter-point timing
+
+The sequencer plays the taught points in order (or, in auto-run, one pass; §8.1). Each taught point
+carries: `name`, `joints[6]`, a `gripper` state, a `speed_percent`, and an I/O action
+(`io_outputs[]` + `io_values[]`). For each transition to point *i* the sequencer:
+
+1. **Chooses the transition speed by a "slowest-of-two" rule** — the override for the move into point *i*
+   is `min(speed of the point we are leaving, speed of point i)`, so a slow point slows **both** its
+   approach and its departure. Home has no taught speed; it uses `home_speed_percent` (40 %) in the rule.
+   The override is only re-sent when it differs from the last one sent (`EXECJOVRD <percent>`; §4.3).
+2. **Sends the point as one absolute joint move** (`EXECMOV JTMP`, the verified `JTMP = J_CURR` /
+   `JTMP.Jn = JTMP.Jn + RAD(d)` form; §4.3), polling `JPOSF` until it settles (reached = at target and
+   still for 0.2 s).
+3. **On arrival, actuates the point's gripper and outputs** — the gripper is re-commanded only if its
+   state changed (avoiding the ~0.6 s `gripper_wait_s` settle when it did not); each output bit in the
+   point's I/O action is written with the driver `line/set` `out<n>` signal (n = 0–15 or 900–907).
+
+**The inter-point timing experiment (2026-10-20/21).** The robot was observed stopping ~1.4 s at every
+point in a 47-point assembly loop. Instrumented informally (operator observation, not a timing harness —
+see the caveat below), the dwell decomposed into host-side overhead, **not** motion:
+
+| Source of dwell | Cost | Fix applied |
+|---|---|---|
+| Re-reading the four higher I/O bytes (8–15, hand 900–907) at every point | ~0.4 s (four extra 9600-baud byte reads) | Read all four **only when the arm is settled**; while moving read **one per poll, round-robin**; skip entirely if a move is queued |
+| Re-commanding the gripper + `gripper_wait_s` wait, even when unchanged | ~0.6 s | Skip the gripper command (and its wait) when the state is unchanged |
+| Re-sending the speed override when unchanged | serial round-trip | Send `EXECJOVRD` only on a change |
+
+Result: inter-point dead time fell from **~1.4 s to ~0.4 s**. The **residual ~0.4 s is the physical
+deceleration to a full stop** at each point and **cannot be removed** — the controller rejects continuous
+(`CNT`) blending over this serial link (error 5640; §4.4, §8.1 of `docu/ROBOT_CONTROL.md`). This is the
+honest ceiling: the dwell is reduced, not eliminated. The ~1.4 s / ~0.4 s figures are coarse operator
+observations, not harness-instrumented measurements with repeats.
+
 ---
 
 ## 8. The control panel (GUI)
@@ -581,6 +614,15 @@ the auto-run is deliberately gated on the arm being *at home*:
 
 If home is later moved to a different taught point, set `auto_start_point` to that point's name so the
 pass still starts at the point after it.
+
+**Identifying the sensor bit (experimental).** With a part present at the TCP the input byte read
+`00010010` (`line_inputs = 18`); with no part it read `00010000` (16). Bit 4 (IN4) is always on in this
+cell, so the differing bit is **bit 1 → IN1**, which is why `auto_input_bit = 1`. The new home was
+captured by reading the robot's live pose (`/rv2aj/status`) while the operator held the arm at the
+pick/wait position; those joint angles (§5.3) were written to `home_joints_deg` and verified to coincide
+with the taught point P2E (`−217.26 / −97.21 / 219.75 / — / −164.49 / −350.46`). `AUTO_HOME_TOL_DEG` is a
+compile-time constant (10°) in `sequencer_node.py`; `_near_home()` compares each fitted joint
+(J1,J2,J3,J5,J6 — J4 absent) against `home_joints_deg`, skipping any NaN reading.
 
 ---
 

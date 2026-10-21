@@ -78,6 +78,31 @@ this arm if that is not handled.
 The absence of Ethernet is a defining constraint of this platform and shapes
 everything in sections 4 to 6.
 
+### 1.4 Measured joint ranges on this specific unit
+
+The ranges in section 1.2 are the manufacturer's specification. The **actual
+software limits in use** were obtained empirically on this unit with a probe
+script (`test/probe_joint_limits.py`): 5-degree steps at 5 % speed until the
+controller raised a range alarm, with the limit then set about 2 degrees inside
+the alarm point. **OBSERVED**, values are controller readings in the current
+(software-calibrated, section 5.1) frame, not the manual's frame:
+
+| Joint | Alarm points (measured) | Limit set | Note |
+|---|---|---|---|
+| J1 | −329.7 / −19.5 | −327.5 … −21.5 | + end repeated at −19.46 |
+| J2 | −152 (table) / +2.7 | −150 … +0.5 | − side stopped by the table guard, not the controller |
+| J3 | −44.7 / +181.6 | −43 … +210 | raised 2026-10-16: the controller soft limit (`MEJAR`) was found wide open (±1800°); the arm was jogged to 194.41 |
+| J5 | −274 / −82.0 | −272 … −84 | ≈192° span; the + end at −82 is where it "refused to move up" |
+| J6 | none in −425 … +339 | −425 … +335 | no alarm in the tested range |
+
+Two points are worth stating for a reader. First, these readings are in a frame
+the operator re-calibrated in software (section 5.1), so they do not match the
+manual's symmetric ranges numerically even though the physical travel does.
+Second, the controller's own range parameter (`MEJAR`) was found effectively
+disabled on this unit, so the *controller* did not enforce J3 until ±1800°; the
+enforced limits are therefore the ones the host stack applies, which is itself a
+finding about the state an obsolete unit can be left in.
+
 ---
 
 ## 2. The five-degree-of-freedom constraint
@@ -220,33 +245,85 @@ Preconditions: the pendant must be **disabled**, and the controller must be in
 1;1;<COMMAND>\r
 ```
 
-The two leading fields are the robot number and the slot number. Responses:
+The two leading fields are the robot number and the slot number, terminated by a
+carriage return. Responses begin with `Q` and a status word:
 
 | Response | Meaning |
 |---|---|
-| `Qo` | Command accepted |
-| `Qe` | Error |
-| `Qx` | Error |
+| `Qo…` | Command accepted; any payload (e.g. a variable value) follows |
+| `Qe…` / `Qx…` | Error / rejected |
+
+**OBSERVED, and important in practice:** a **lowercase** status letter
+(`Qok`, `Qer`) signals that an **alarm is pending** even when the command itself
+was accepted; the alarm is cleared with `RSTALRM`. The host must therefore not
+treat a syntactically successful reply as "all well" without also checking the
+alarm state reported by `STATE` (section 4.7). A further quirk of this unit
+(**OBSERVED**): after any alarm reset, the *next* motion command fails unless the
+servo is cycled **off and on** again, so the driver's reset routine performs
+`SRVOFF`/`SRVON` automatically.
 
 ### 4.3 Confirmed command set
 
-Verified by readback on the physical hardware. **OBSERVED.**
+Every command below was verified by readback on the physical hardware.
+**OBSERVED.** Each is sent inside the `1;1;…` frame of section 4.2.
 
 | Command | Function | Class |
 |---|---|---|
-| `CNTLON` | Acquire control rights | Session |
+| `CNTLON` | Acquire control (operation) rights | Session |
 | `CNTLOFF` | Release control rights | Session |
 | `SRVON` | Servo on | Power |
 | `SRVOFF` | Servo off | Power |
-| `EXECJOVRD <n>` | Set joint speed override, percent | Motion parameter |
+| `STOP` | Halt; **also halts an `EXECMOV` in progress** | Motion |
+| `RSTALRM` | Reset a latched alarm | Recovery |
+| `STATE` | Read controller state word (mode, alarm, error field) | Read-only |
+| `PPOSF` | Read Cartesian pose (X, Y, Z, A, B…) | Read-only |
+| `JPOSF` | Read joint angles J1…J6 (J4 reports `****`) | Read-only |
+| `VAL<expr>` | Read the value of a variable or expression | Read-only |
+| `EXECJOVRD <n>` | Set joint speed override, 1–100 % | Motion parameter |
+| `EXECJTMP=J_CURR` | Copy the current joint pose into `JTMP` | Motion build |
+| `EXECJTMP.J<n>=JTMP.J<n>+RAD(<d>)` | Add `d` degrees to one joint of `JTMP` | Motion build |
+| `VALJTMP` | Read `JTMP` back (for verification before moving) | Read-only |
+| `EXECMOV JTMP` | Move to the joint pose held in `JTMP` | Motion |
+| `EXEC…HAND…` (gripper, with hand number) | Open/close the pneumatic hand | I/O write |
 | `EXECM_OUT(n)=1` | Set digital output bit n | I/O write |
-| `VALM_INB(0)` | Read digital input byte 0 | I/O read |
-| `VALM_OUTB(0)` | Read digital output byte 0 | I/O read |
+| `VALM_INB(b)` | Read digital input byte b (e.g. `VALM_INB(0)`) | I/O read |
+| `VALM_OUTB(b)` | Read digital output byte b | I/O read |
 
 Two prefixes are visible in this set and the distinction matters:
 
 - **`EXEC`** submits a single MELFA-BASIC line for **immediate execution**
 - **`VAL`** reads the value of a variable or expression
+
+`EXECJOVRD` requires control rights: without a preceding `CNTLON` it is rejected
+with **L6020 "operation is disabled"** (**OBSERVED**).
+
+### 4.3.1 The verified absolute-joint-move sequence
+
+There is no single "move to these joint angles" command exposed cleanly over
+this interface; it must be **built** on the controller through a temporary
+variable. The sequence below is the one verified on this unit, and the stack
+uses no other form for absolute joint motion:
+
+```
+EXECJOVRD <percent>              set speed first (takes effect on the next EXECMOV)
+EXECJTMP=J_CURR                  JTMP := current pose
+VALJTMP                          read JTMP back (sanity)
+EXECJTMP.Jn=JTMP.Jn+RAD(<delta>) for each moving joint n, delta = target − current, in degrees
+VALJTMP                          read JTMP back and verify every component before moving
+EXECMOV JTMP                     execute
+```
+
+`EXECMOV` replies as soon as motion **starts**; arrival is detected by polling
+`JPOSF` (section 4.7), not from the reply.
+
+**Rejected forms, OBSERVED.** The compact tuple expression
+`J_CURR+(d1,d2,…)` is **not** accepted and raises **L4220 (syntax error)**.
+This is why the stack edits one joint component at a time and reads `JTMP` back
+before issuing `EXECMOV`: a wrong guess here is a motion command, not a compile
+error (the discipline of section 4.5). This exact invariant — that only the
+verified `JTMP`/`EXECMOV` form is ever emitted and never the tuple form — is
+pinned by an automated test
+(`test_absolute_joint_move_uses_only_verified_syntax`).
 
 ### 4.4 The control-rights model
 
@@ -274,6 +351,47 @@ The principle generalises: on a PLC an incorrect guess produces a compile
 error, on a manipulator it produces a collision. Any published methodology for
 reverse-engineering a legacy robot interface should state its containment
 measures explicitly.
+
+### 4.6 Error and alarm codes observed
+
+The following codes were seen on this unit and are the ones a host program must
+recognise and handle. **OBSERVED.** The `STATE` error field reports the most
+recent error, which is not necessarily an active one.
+
+| Code | Meaning | Context in which it appeared |
+|---|---|---|
+| 0965 | Excessive error 1 | servo could not follow the commanded motion |
+| 1060 / 1069 | Encoder communication error | appeared as the stale "last error" in `STATE` |
+| 1120 | Encoder ABS position data lost | origin lost after battery failure (section 3.4) |
+| 4220 (L4220) | Syntax error | e.g. the rejected `J_CURR+(…)` tuple form (section 4.3.1) |
+| 5150 | The origin has not been set | origin lost — **every `EXEC` command is then refused** |
+| 5600 | Cannot execute during an error | an alarm must be reset first |
+| 5640 | Cannot execute during RUN | a motion is still running — see section 5 |
+| 6010 | Illegal command | |
+| 6020 (L6020) | Operation is disabled | `CNTLON` was missing before `EXECJOVRD` |
+| `81069x` in `STATE` | joint range limit on axis x | a controller range limit (`MEJAR`) reached |
+
+Error 5150 is the one that makes the battery/origin failure of section 3.4 not
+merely a calibration nuisance but a total loss of host control: with the origin
+unset, *no* `EXEC` command runs at all until the origin is recovered by the
+`ABS` mark method.
+
+### 4.7 Polling cadence
+
+The host reads state continuously so that motion completion, alarms and I/O are
+observed without blocking. The cadence used on this link, chosen against the
+≈873 character/second throughput of section 5.4:
+
+| Query | Interval | Rationale |
+|---|---|---|
+| `JPOSF` | every cycle, ≈0.03 s loop (one query ≈0.1 s at 9600 baud) | arrival detection needs responsive joint readings |
+| `STATE` + `PPOSF` | 1.0 s idle, 0.5 s while moving | mode/alarm/pose, faster while a move is tracked |
+| Line I/O bytes (`VALM_INB`/`VALM_OUTB`) | all four higher bytes at once when idle; one byte round-robin while moving; skipped when a command is queued | keeps a queued move from waiting behind four reads (section 8.2) |
+
+Arrival is declared from `JPOSF`: a pose is **reached** when it is at target and
+unchanged for 0.2 s, **stopped short** when it is unchanged for 1.0 s away from
+target, with a 120 s timeout. These thresholds are parameters of the driver, not
+of the controller.
 
 ---
 
@@ -420,6 +538,15 @@ arrival before proceeding. It is the mechanism underlying the per-waypoint
 dwell, and relaxing it is an alternative to `CNT` where approximate positioning
 is acceptable.
 
+The syntax above is confirmed from the MELFA-BASIC IV command list, but a
+distinction matters for this platform: **`OVRD` (as `EXECJOVRD`) is the only one
+of these the implemented system issues over the serial link**, because that is
+the one verified accepted here (section 4.3). Acceleration shaping via `ACCEL`
+was **not** adopted over this interface and the implemented system deliberately
+varies speed only (section 8.1). `CNT`, `FINE` and `SPD` belong to the
+resident-program route (Method C, section 6), which was not implemented, so
+their behaviour on this unit is **UNVERIFIED** here.
+
 ### 7.3 Program structure
 
 ```basic
@@ -461,56 +588,128 @@ dwell that is **not** physical.
 
 ### 8.1 Teach-and-repeat over RS-232
 
-Each taught point stores joint angles, a gripper state, a per-point **speed**
-and a set of digital **outputs**. Playback issues each point as an absolute
-joint move in the verified form of section 4.3 (`JTMP = J_CURR`,
-`JTMP.Jn = JTMP.Jn + RAD(d)`, `VAL`, `EXECMOV JTMP`), polling `JPOSF` until the
-pose settles — reached is "at target and still for 0.2 s" — before the next.
+Each taught point is a record with a **name**, the six **joint angles** (J4
+stored as 0, section 1.1), a **gripper** state (`open`/`closed`/none), a
+per-point **speed** percentage and a list of per-point **outputs** (each an
+`(output, value)` pair). Points are persisted as JSON (`~/.ros/rv2aj_points.json`).
+Playback issues each point as the absolute joint move verified in section 4.3.1
+(`EXECJTMP=J_CURR`, per-joint `EXECJTMP.Jn=JTMP.Jn+RAD(delta)`, `VALJTMP`
+read-back, `EXECMOV JTMP`) and declares arrival by polling `JPOSF` against the
+0.2 s / 1.0 s / 120 s thresholds of section 4.7 before continuing.
 
-- **Per-point speed.** Each transition sets the speed override (`OVRD` /
-  `JOVRD`, 1–100 %) to the **slower of the two endpoints' speeds** — a
-  "slowest-of-two" rule — so a slow point slows both its approach and its
-  departure. Home is treated as a transit point with a fixed speed of its own.
-  Only the override is varied; `ACCEL` is not, because it was not accepted over
-  this link (section 4.3), so acceleration shaping is deliberately out of scope.
-- **Per-point outputs.** A point may carry output bits actuated **on arrival**,
-  in the same step as the gripper, so the taught sequence drives the station's
-  pneumatics and signals, not only the arm.
+- **Per-point speed.** The speed override for a transition is the **slower of
+  the two endpoints' speeds** — a "slowest-of-two" rule — so marking a grab
+  point slow also slows the approach to it and the retreat from it. Concretely,
+  the destination's speed and the last point actually reached are compared and
+  `min` is taken; if nothing has been reached yet (or the previous move did not
+  finish cleanly) only the destination's own speed is used. The GUI exposes two
+  presets, **Slow = 10 %** and **Fast = 40 %**; points saved before the feature
+  existed default to **20 %**. **Home** has no taught speed of its own and is
+  assigned a fixed **40 %** for the purpose of this rule. Only the override is
+  varied — `ACCEL` is not issued (section 7.2).
+- **Override is set before the move, and skipped when unchanged.** `EXECJOVRD`
+  takes effect on the next `EXECMOV`, so the speed is sent first and the move is
+  issued only once it is confirmed. When the required override already equals the
+  controller's current override (authoritative in the status stream), the extra
+  serial round-trip is skipped — most consecutive points share a speed, and
+  re-sending it would just be a round-trip of standing still.
+- **Per-point outputs and gripper actuated on arrival.** On reaching a point the
+  sequencer runs its gripper command (if any) and then each saved output action
+  in order, each waited out before the next; the loop only advances once all of
+  them complete. The gripper is actuated **only when its state actually changes**
+  (re-commanding it to where it already is would cost a command plus the
+  `gripper_wait_s` = 0.6 s pneumatic settle for no physical effect). Outputs are
+  written as single bits (driver `line/set`, one bit written and its byte read
+  back), so a taught sequence drives the station's pneumatics and signals, not
+  only the arm.
 
 ### 8.2 Reducing the per-waypoint dead time
 
-The dead time first measured at each point (~1.4 s) came not from motion but
-from **host-side redundancy**: re-reading four higher I/O bytes at every point,
-re-commanding an unchanged gripper (with its ~0.6 s settle), and re-sending an
-unchanged speed override. Suppressing the redundant commands — and reading the
-higher I/O bytes round-robin while moving, all of them at once only when the arm
-is idle — cut the inter-point dead time to ~0.4 s.
+The dead time first observed at each point (≈1.4 s) came not from motion but
+from **host-side redundancy**, three contributions each costing serial
+round-trips while the arm stood still:
 
-The residual is the physical deceleration to a full stop at each point, which
-cannot be removed without `Cnt` blending; section 7 and error 5640 establish
-that blending is impossible over this link. This is the honest ceiling: the
-dwell is **reduced, not eliminated**, and any cycle-time claim must say so.
+1. **I/O re-reads.** Four higher I/O bytes (inputs 8–15, outputs 8–15, and the
+   two hand bytes at 900) were being read at *every* point. These now refresh
+   all at once only when the arm is idle, and round-robin **one byte per poll**
+   while moving, backing off entirely when a motion command is already queued so
+   a move is never delayed behind four reads.
+2. **Redundant gripper command.** The gripper was re-commanded at every point
+   even when its state was unchanged, each time incurring the 0.6 s pneumatic
+   settle (section 8.1). It is now actuated only on a state change.
+3. **Redundant override.** The speed override was re-sent at every point; it is
+   now skipped when already correct (section 8.1).
+
+Removing these cut the inter-point dead time to ≈0.4 s. The residual is the
+**physical deceleration to a full stop** at each point, which cannot be removed
+without `CNT` blending; section 5 and error 5640 establish that blending is
+impossible over a one-command-at-a-time link. This is the honest ceiling: the
+dwell is **reduced, not eliminated**. The ≈1.4 s → ≈0.4 s figures are coarse
+operator observations, not instrumented measurements (section 11.2). The I/O
+poll behaviour — all-at-once when idle, one byte while moving, skipped when a job
+is queued — is pinned by an automated test
+(`test_higher_io_poll_instant_when_idle_rotating_when_busy`).
 
 ### 8.3 Sensor-triggered single-pass automation
 
-A part sensor mounted on the robot's tool and wired to input **IN1** lets the
-cell run one assembly pass per arriving part. Because the sensor rides with the
-arm, a reading is only meaningful at the park pose, so the sequencer **gates the
-trigger on the arm being idle and within a joint tolerance (10°) of the home /
-park pose**. One pass then runs from the point *after* the park point to the
-last point and returns home to re-arm.
+A part sensor mounted on the robot's **tool** and wired to digital input **IN1**
+(`auto_input_bit = 1`) lets the cell run one assembly pass per arriving part.
+Because the sensor rides with the arm, a reading is only meaningful at the park
+pose, so the trigger is gated on the arm actually being there.
 
-- The trigger is the **rising edge** of *(idle ∧ at-home ∧ sensor)*. Readings
-  taken mid-pass, while the sensor is moving through the air near the stations,
-  are ignored; returning home re-arms for the next part, so a queue of parts is
-  served one pass at a time **without an explicit queue**.
-- This is the sensor-reactive behaviour that the comparison table (section 9)
-  marks "per-waypoint only" for Method B — obtained here at the **pass level**
-  (one trigger per pass) rather than inside the motion loop, which is exactly
-  what the serial latency of section 5.4 permits.
-- **Safety.** Servo power is enabled only by a human; arming requires the servo
-  on and at least one taught point; **STOP disarms** the automation; and it
-  starts disarmed on every restart.
+**At-home test.** "At home" is defined as every *fitted* joint (J1, J2, J3, J5,
+J6 — J4 is skipped, section 1.1) being within `AUTO_HOME_TOL_DEG = 10°` of the
+stored home pose, a NaN reading failing the test. The home pose used is the
+operator's 2026-10-21 pick/wait pose
+`[−217.26, −97.21, 219.75, —, −164.49, −350.46]`, which coincides with the
+taught point **P2E**.
+
+**Trigger.** On every status update, the sequencer forms
+`ready = idle ∧ sensor ∧ at-home ∧ connected ∧ servo_on`, where `idle` means no
+loop is running and no goal is outstanding and `sensor` is bit 1 of the input
+byte. A pass is started on the **rising edge** of `ready` (it was false on the
+previous update and is true now). This has two consequences without any explicit
+queue: readings taken mid-pass, while the sensor is swinging through the air near
+the stations, are ignored because the arm is not idle-and-at-home; and returning
+home at the end of a pass re-establishes the condition, so a succession of parts
+is served **one pass at a time**.
+
+**Pass extent.** A pass does not restart from the first taught point. Because the
+arm is already standing at the park point (P2E), the pass starts at the point
+**immediately after** `auto_start_point` and runs to the last taught point; it
+does not wrap into a continuous loop. If `auto_start_point` is not found among
+the points, it falls back to starting at the first point (logged as a warning).
+On completion the arm is sent back to the home pose and the automation re-arms
+from there.
+
+**Interface.** Arming/disarming is a service (`loop/auto`, `SetAutoRun{enable,
+input_bit}`), and the sequencer publishes `auto_mode` / `auto_input_bit` in its
+latched status so the GUI can reflect the armed/running state.
+
+**Where the reactivity lives.** This is the sensor-reactive behaviour the
+comparison table (section 9) marks "per-waypoint only" for Method B, obtained
+here at the **pass level** — one trigger per pass — rather than inside the motion
+loop. That is exactly what the serial latency of section 5.4 permits: the host
+is not in the loop at the waypoint rate, only at the pass boundary.
+
+**Safety invariants (OBSERVED, enforced in code):**
+
+- Servo power is enabled **only by a human**; the automation never issues
+  `SRVON`. Arming is refused unless the robot is connected, the servo is on, and
+  at least one point is taught.
+- **STOP disarms** the automation (clears `auto_mode`), so the physical/`+`-key
+  stop is also an automation kill switch.
+- The automation **starts disarmed** on every restart; a part already sitting at
+  home when it is armed counts as a fresh trigger (the rising-edge state is reset
+  on arming).
+
+### 8.3.1 Experimental instance
+
+The system was exercised on a real assembly task on Station 4 of the Festo MPS
+500 line: a taught sequence of **47 points** carrying per-point speeds and
+gripper/output actions, executed on the physical robot over RS-232 (the run is
+recorded in the repository). This is the concrete instance behind the method; it
+is an existence demonstration, not an instrumented benchmark (section 11.2).
 
 ### 8.4 Relationship to the methods
 
@@ -549,11 +748,14 @@ most useful thing to communicate about legacy robot integration.
 
 ### 10.1 What was considered
 
-A natural-language and vision-driven control layer was explored, intended to
-run on modest local hardware (Ryzen 5 6600, RTX 3050 4 GB, 8 GB RAM). The
-components considered were a fine-tuned small language model for instruction
-interpretation, a camera for perception, and a mapping from intent to robot
-motion.
+A natural-language and vision-driven control layer was explored, intended to run
+**fully offline** on modest local hardware: a laptop with a Ryzen 5 6600, an
+**RTX 3050 Laptop GPU with 4 GB** of VRAM, and **7 GB** of system RAM (of which
+the editor alone consumes about 3 GB), under Ubuntu 24.04 and ROS 2 Jazzy. The
+4 GB VRAM ceiling is the operative constraint on model choice and is why a small,
+quantised model was required rather than a larger one. The components considered
+were a fine-tuned small language model for instruction interpretation, a camera
+for perception, and a mapping from intent to robot motion.
 
 ### 10.2 Why end-to-end visual servoing was ruled out
 
@@ -577,8 +779,29 @@ A **propose-and-validate** structure:
 
 The validator is not a safety afterthought. Given a model that produces
 plausible but occasionally invalid outputs, it is the component that makes the
-system usable at all, and the joint limits in section 1.2 are precisely what
-it clamps against.
+system usable at all, and the joint ranges of sections 1.2 / 1.4 are precisely
+what it clamps against. Its enforced rule everywhere is directional: a joint
+already outside its range may stay or move back **toward** the range, never
+further out.
+
+Two further policies shape how proposals reach the arm:
+
+- **Confirmation (`confirm_mode`).** In the default `guesses` mode, a clear,
+  unambiguous command runs at once and only a *guess* (an interpretation the
+  model is unsure of) asks the operator "Onaylıyor musunuz?" first; in `all`
+  mode every motion asks. A proposed plan expires if not confirmed within
+  `plan_ttl_s` = 120 s.
+- **Grounding in taught examples.** The model is shown the `k_examples` = 8
+  closest taught request→command pairs for each request, so interpretation is
+  anchored in this cell's own vocabulary rather than in generic priors.
+
+Note on the current deployment: the enforced joint limits were switched **off**
+by the operator on 2026-10-19 (the configuration carries the permissive range
+but retains the measured values of section 1.4 in a comment). This is a
+deliberate operator choice recorded in the configuration, not a property of the
+method; the clamping machinery remains in place and re-enabling it is a
+one-line change. A paper should either re-enable the measured limits for its
+reported runs or state plainly that they were disabled.
 
 ### 10.4 Perception hardware
 
@@ -594,7 +817,48 @@ is made. The distinguishing test is whether it enumerates a side-by-side
 resolution such as 2560x720, which indicates both sensors captured in one
 frame. These modules are **not factory calibrated**; `cv2.stereoCalibrate` and
 `cv2.stereoRectify` must be run, and at that baseline the useful depth range is
-roughly 0.2 to 1.5 m.
+roughly 0.2 to 1.5 m. The DVT Legend 510MR on the cell is a separate smart
+camera that was brought up read-only from Ubuntu with no vendor software; its
+reverse-engineering is documented in the main repository and is out of scope
+here.
+
+### 10.5 The fine-tuned model
+
+The interpretation model is **`rv2aj-qwen`**, a LoRA fine-tune of
+**Qwen3-4B-Instruct-2507** trained for this command-translation task and served
+locally through Ollama (`http://127.0.0.1:11434`). It replaced an earlier
+few-shot approach using a stock `qwen3:4b` "thinking" build.
+
+**OBSERVED**, on a held-out set of **200 unseen generated sentences**:
+
+| Model | Accuracy | Note |
+|---|---|---|
+| `qwen3:4b` (few-shot prompt) | 71.5 % | confused joints, flipped wrist directions, answered questions with commands |
+| **`rv2aj-qwen`** (LoRA fine-tune) | **96.0 %** | and roughly twice as fast per request |
+
+The fine-tune was feasible on the 4 GB GPU precisely because the base model is
+small and the adapter is a LoRA. The training data was a generated set of
+Turkish/English request→command pairs, seeded from about 160 hand-written
+example pairs that also serve as recall hints at run time. The 71.5 %→96.0 %
+figure is a within-project evaluation on self-generated sentences, not a
+standardised benchmark; it should be reported as such.
+
+One operational pitfall is worth recording because it is reproducible and
+non-obvious: out-of-memory crashes on the 4 GB GPU were traced to the model
+server's **prompt cache** rather than to the model weights, and were resolved by
+constraining the cache rather than by shrinking the model.
+
+### 10.6 Offline speech and safety listeners
+
+The spoken interface is fully offline. Speech-to-text uses **Whisper (small)**,
+chosen over `base` because it is substantially better on Turkish at an
+acceptable ≈2 s per phrase. Text-to-speech uses **Piper** with a community
+Turkish voice. Independently of the main recogniser, an always-on offline
+listener (**Vosk**) watches for the stop word "dur" as an extra stop layer, and
+a `+`-key handler triggers an emergency stop even while text is being typed.
+These layers matter because the AI path must never be the *only* thing standing
+between an operator and a stop command; the deterministic STOP (section 4.3,
+which also halts an `EXECMOV` in progress) remains the authority.
 
 ---
 
@@ -616,6 +880,19 @@ roughly 0.2 to 1.5 m.
   rather than inside the motion loop — including the honest accounting that the
   per-point dwell is reduced (host-side redundancy removed) but not eliminated
   (physical deceleration remains; no `Cnt` over serial)
+- The **tool-mounted-sensor gating pattern** of section 8.3: trusting a sensor
+  that rides with the arm only at a known pose (a joint-tolerance at-home test),
+  with a rising-edge trigger that needs no explicit part queue — a transferable
+  idea for cells where the sensor cannot be fixed to the world frame
+- The **propose-and-validate** control pattern of section 10 with a reproducible
+  within-project result (71.5 %→96.0 % on 200 unseen sentences from a LoRA
+  fine-tune of a 4 GB-class model, section 10.5), presented as an engineering
+  result rather than a benchmark claim
+- The **safety architecture**: servo power strictly human-issued, a deterministic
+  STOP that also halts an in-progress move and disarms automation, redundant
+  offline stop listeners, and the use of **automated tests** to pin motion-safety
+  invariants (verified-syntax-only moves, frozen-joint handling, I/O-poll
+  backoff) rather than relying on review alone
 
 ### 11.2 What is not yet defensible
 
@@ -641,7 +918,16 @@ roughly 0.2 to 1.5 m.
    lookahead needed to maintain continuous motion.
 5. **Validator intervention rate.** How often the model's proposal is out of
    range and has to be clamped. This quantifies the validator's necessity
-   rather than asserting it.
+   rather than asserting it. (Note that a reported rate is only meaningful with
+   the measured joint limits of section 1.4 **enabled**, see section 10.3.)
+6. **Auto-run trigger reliability.** Over many parts, the false-trigger rate
+   (a pass started with no part, or a mid-air reading acted on) and the
+   missed-trigger rate, as a function of `AUTO_HOME_TOL_DEG`. This turns the
+   at-home gating of section 8.3 from a plausible design choice into a measured
+   one.
+7. **Per-point dead-time, instrumented.** The ≈1.4 s→≈0.4 s claim of section 8.2
+   repeated with host-side timestamps and repeats, separating the mechanical
+   deceleration from the host-side overhead component.
 
 ### 11.4 Reproducibility
 
@@ -649,6 +935,12 @@ Everything needed to repeat the serial work is in section 4: link parameters,
 frame format and the confirmed command set. The joint limits in section 1.2 are
 cited to the manufacturer's manual. The failure modes in section 3.4 and the
 negative result on conveyor control are reproducible on any comparable cell.
+
+The implemented system of section 8 is reproducible from the repository: the
+move sequence is section 4.3.1, the speed/settle/gripper parameters and the home
+and `auto_start_point` values are in a single configuration file, and the
+safety-critical invariants are pinned by the named automated tests cited in
+sections 4.3.1, 8.2 and 11.1.
 
 What is **not** reproducible from this document is the program-upload command
 set of section 6.4, because it has not been established. A paper should either

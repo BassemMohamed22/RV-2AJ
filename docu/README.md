@@ -78,7 +78,7 @@ else is marked as a hypothesis.
 ## 2. The Mitsubishi RV-2AJ robot
 
 > **For the full treatment of control methods, see
-> [`docs/ROBOT_CONTROL.md`](docs/ROBOT_CONTROL.md).** That document covers the
+> [`ROBOT_CONTROL.md`](ROBOT_CONTROL.md).** That document covers the
 > manipulator specifications and joint limits, the 5-DOF constraint, pendant
 > teaching, host control over RS-232, the command-level interface problem, the
 > proposed resident-program architecture, and notes for publication. This
@@ -202,6 +202,32 @@ Verified by readback on the physical hardware:
 | `VALM_INB(0)` | Read input byte 0 |
 | `VALM_OUTB(0)` | Read output byte 0 |
 
+**Observed I/O state, read-only survey of 2026-10-16.** A full read of every
+general-purpose and hand I/O byte returned the following (raw controller
+replies preserved in `io_survey_2026-10-16.txt`):
+
+| Byte | Command | Reply value | Bits set |
+|---|---|---|---|
+| Input byte 0 | `VALM_INB(0)` | `+16` | IN4 |
+| Input byte 8 | `VALM_INB(8)` | `+170` | IN9, IN11, IN13, IN15 |
+| Output byte 0 | `VALM_OUTB(0)` | `+0` | none |
+| Hand output byte 900 | `VALM_OUTB(900)` | `+86` | 901, 902, 904, 906 |
+
+All other general-purpose bytes (inputs/outputs 16, 24, 32) read zero, and the
+hand **input** byte 900 read zero. The four hand outputs that are set
+(901, 902, 904, 906) are one side of each pneumatic valve pair, i.e. the
+gripper's rest state. The active signals therefore sit only on input byte 0,
+input byte 8 and the hand bytes; everything else is idle. `VALM_INW(0)` read
+back `−22000`, the word form of the same byte-0 state plus the sign the
+controller applies to the high word.
+
+**Output write permission, CONFIRMED.** On 2026-09-25 the controller
+**rejected** `EXECM_OUT(0)=1` with reply `Qer515000000`: the general-purpose
+outputs OUT0–OUT3 were not writable in the controller's parameter set. After the
+operator opened the relevant parameter on 2026-10-16, OUT0–OUT3 became settable
+alongside OUT4–OUT7 (written one bit at a time and read back to confirm). The
+robot's station handshake itself uses only OUT4–OUT7 (section 3.2).
+
 ### 2.6 Error codes encountered
 
 | Code | Meaning | Resolution |
@@ -301,16 +327,45 @@ removing host-side redundancy (unchanged gripper/override re-commands,
 all-bytes I/O polling), but the physical stop at each point remains because
 blending is unavailable over serial (section 2.8).
 
-On top of this, the cell runs **one assembly pass per part**: a part sensor
-mounted on the tool (input IN1) triggers a single pass, gated on the arm being
-parked at the pick/wait pose (within a joint tolerance of home) so that a
-TCP-mounted sensor is only trusted there; the arm then returns home and re-arms
-for the next part, ignoring readings taken mid-pass. Servo power stays operator-
-only and STOP disarms the automation. This is the part-level reactivity that a
-serial-only controller can support — one trigger per pass rather than a control
-loop closed at the waypoint rate. The full method, state machine and safety
-model are documented in the companion [`ROBOT_CONTROL.md`](ROBOT_CONTROL.md)
-section 8 and in the main repository README.
+**Per-point speed, CONFIRMED.** Each taught point stores its own override; the
+transition between two points is run at the **slower of the two endpoints'
+overrides** (a "slowest-of-two" rule), so a slow point slows both its approach
+and its departure. Two presets are exposed, Slow = 10 % and Fast = 40 %. Home
+has no taught speed of its own and is given a fixed transit value of 40 %. Only
+the speed override (`EXECJOVRD`) is varied; `ACCEL` is **not**, because the
+controller did not accept it over this serial link (section 2.8), so
+acceleration shaping is deliberately out of scope.
+
+**Per-point dead time.** The dead time first observed at each point (~1.4 s)
+came not from motion but from host-side redundancy: re-reading four higher I/O
+bytes at every point, re-commanding an unchanged gripper (with its ~0.6 s
+settle), and re-sending an unchanged override. Suppressing the redundant
+commands, and reading the higher I/O bytes round-robin while moving (all of them
+at once only when the arm is idle), cut it to ~0.4 s. These two figures are
+**coarse operator observations, not instrumented measurements.** The residual is
+the physical deceleration to a full stop, which cannot be removed without `Cnt`
+blending (section 2.8).
+
+**Sensor-triggered single-pass automation.** On top of this, the cell runs **one
+assembly pass per part**. A part sensor mounted on the robot's tool and wired to
+input **IN1** triggers a pass. Because the sensor rides with the arm, a reading
+is only meaningful at the park pose, so the trigger is gated on the arm being
+**idle and within 10° (`AUTO_HOME_TOL_DEG`) of the home pose** on every fitted
+joint. Home was moved on 2026-10-21 to the pick/wait pose beside the parts; it
+coincides with the taught point **P2E**. A pass therefore starts at the point
+**after P2E** and runs to the last taught point, then returns home — it does not
+restart from the top or wrap into a continuous loop. The trigger is the **rising
+edge** of *(idle ∧ at-home ∧ sensor)*: the arm leaves home during the pass, so
+readings taken mid-pass (the sensor moving through the air) are ignored, and
+returning home re-arms for the next part, serving a queue of parts one pass at a
+time without any explicit queue. Servo power is enabled only by a human (the
+automation never enables it); arming requires the servo on and at least one
+taught point; **STOP disarms** the automation; and it starts disarmed on every
+restart. This is the part-level reactivity a serial-only controller can
+support — one trigger per pass, not a control loop closed at the waypoint rate.
+The full method, state machine and safety model are in the companion
+[`ROBOT_CONTROL.md`](ROBOT_CONTROL.md) section 8 and in the main repository
+README.
 
 ---
 
@@ -748,10 +803,38 @@ a PC, then it runs standalone and reports Pass, Fail, Warn and Busy.
 
 ### 7.2 Discovery from Ubuntu, CONFIRMED
 
-The camera has **no fixed factory IP** and self-assigns a link-local address.
-Ping sweeps find nothing, which looks like a dead device.
+All of the following is backed by the captured output in `dvt_legend/`
+(`step*.txt`, `boot.pcap`); see [`dvt_legend/findings.md`](../dvt_legend/findings.md).
 
-It was found by capturing its **boot-time gratuitous ARP**:
+**The link.** The laptop's only wired port is `enp2s0` (r8169 driver, MAC
+`bc:ec:a0:1e:2e:fe`), carrier up at 100 Mb/s full duplex (`ethtool`). Before
+probing it had no IPv4 address — NetworkManager was stuck in "connecting
+(getting IP configuration)", i.e. DHCP with no answer, which is consistent with
+a device that does not run a DHCP server.
+
+**The camera has no fixed factory IP** and self-assigns a link-local address, so
+an ordinary ping sweep finds nothing and the device looks dead.
+
+**What a no-root scan could and could not prove.** Without passwordless sudo
+(and with `arp-scan`/`nmap` not installed), a laptop-side-only probe was run
+from `169.254.1.10/16` with an on-link route to `192.168.0.0/24`:
+
+- ICMP + kernel ARP to `192.168.0.2..254` (excluding `.1`): **0 replies,
+  253/253 ARP entries FAILED**.
+- Broadcast pings to `169.254.255.255` and `255.255.255.255`: **0 replies**.
+- The `enp2s0` RX counter held at **241461 packets before and after** a ~2 min
+  window, while TX rose — so **the camera transmitted nothing at all** over that
+  time: no ARP replies, no broadcasts, no announcements.
+
+This is CONFIRMED to rule out an answering IP in `192.168.0.2–254`, but it
+**cannot** reveal an address in any other subnet, because ARP only answers for
+an exact IP. (A first attempt was discarded as INVALID: GNOME Shell tore down the
+probe profile 3 s after activation, so those packets went out with no source
+address.)
+
+**The boot capture that found it.** With the operator running `tcpdump` as root
+and power-cycling the camera (`boot.pcap`), it announced itself with two
+gratuitous ARPs:
 
 ```
 00:90:68:00:f6:12 > ff:ff:ff:ff:ff:ff  ARP who-has 169.254.246.18 tell 169.254.246.18
@@ -759,82 +842,208 @@ It was found by capturing its **boot-time gratuitous ARP**:
                                         ARP who-has 192.168.10.242 tell 192.168.10.242
 ```
 
-OUI `00:90:68` resolves to **DVT CORP**.
+OUI `00:90:68` resolves to **DVT CORP**. Giving the laptop `192.168.10.10/24`
+then reached the camera: `ping 192.168.10.242` → **3/3 replies, 0.37 ms**, and
+the neighbour table showed `192.168.10.242 lladdr 00:90:68:00:f6:12 REACHABLE`.
+The link-local `169.254.246.18` stopped answering once the routable address came
+up. **Camera = 192.168.10.242, MAC 00:90:68:00:f6:12.**
 
-**Method:** run `tcpdump` as root, then power-cycle the device. Embedded
-network stacks announce themselves at boot, which reveals both MAC and IP
-even on an unknown subnet. This technique is worth remembering for any
-undocumented networked device.
+**Method, generalised:** run `tcpdump` as root, then power-cycle the device.
+Embedded network stacks announce themselves at boot, which reveals both MAC and
+IP even on an unknown subnet. This is worth remembering for any undocumented
+networked device.
 
 ### 7.3 Open ports, CONFIRMED
 
-Full TCP sweep, 7 open of 65535:
+`nmap -Pn -sT -p- --reason -T4` (a TCP connect scan; `-sS` needs root) found
+**7 ports open and 65528 closed** (connection-refused), i.e. a full 1–65535
+sweep with no filtered ports:
 
-| Port | Service | Passive banner |
-|---|---|---|
-| **502** | **Modbus TCP** | none |
-| 3246 | dvt-system | `System Terminal Driver\r\n?` |
-| 3247 | dvt-data | `1\r\n` |
-| 4883 | unknown | none |
-| 5000 | duplicate of 3246 | `System Terminal Driver\r\n?` |
-| 5001 | duplicate of 3247 | `1\r\n` |
-| 7500 | unknown binary | 64-byte records, `04 00 NN 00 ...`, NN counts 00 to 08 |
+| Port | nmap name | Passive banner (connect, send nothing, 5 s) | `nmap -sV` behaviour |
+|---|---|---|---|
+| **502** | mbap (Modbus TCP) | none | none |
+| 3246 | dvt-system | `System Terminal Driver\r\n?` | same banner; a bare `\r\n` gives another `?` prompt |
+| 3247 | dvt-data | `1\r\n` | replies `1\r\n` per probe line |
+| 4883 | (wmlserver) | none | none |
+| 5000 | (upnp) | `System Terminal Driver\r\n?` | identical to 3246 |
+| 5001 | (commplex-link) | `1\r\n` | identical to 3247 |
+| 7500 | (silhouette) | 64 bytes: `04 00` + 62 zero bytes | repeating 64-byte records `04 00 NN 00 ...`, NN counting 00..08 |
 
-**Closed:** 21 (FTP), 23 (telnet), 80 (HTTP). There is no image server and no
-web interface.
+Ports 5000/5001 are the "older systems" aliases of 3246/3247 (section 7.4), so
+the camera exposes the System terminal and DataLink on both the new and the old
+port numbers at once.
 
-**UDP:** 5000 open or filtered. UDP is what the vendor software uses for
+**Closed:** 21 (FTP), 23 (telnet), 80 (HTTP) — so there is no FTP image server
+and no web interface. **UDP** (`nmap -sU --top-ports 100`, run as root): 99
+closed (port-unreachable), **5000/udp open|filtered** (no reply, so open and
+filtered cannot be distinguished). UDP 5000 is what the vendor software uses for
 network discovery.
 
-### 7.4 Protocol, partially documented
+### 7.4 Protocol, recovered from the vendor installer (CONFIRMED)
 
-| Fact | Source |
-|---|---|
-| System commands begin with `#` or `*` | IAI integration note |
-| `#YI` is the inspection trigger | IAI integration note |
-| `help` returns `\r\n!`, so `!` means unknown command | Observed |
-| Two drivers exist: System and DataLink | IAI integration note |
-| Default host part is `.242` | Intellect manual example |
+The protocol was not guessed: the **FrameWork 2.8.0** installer was obtained from
+Cognex and **unpacked without running it**. Its ~33 MB Wise overlay is a series
+of back-to-back raw-deflate streams, which `carve_wise.py` inflated directly
+(7-Zip cannot open a Wise overlay). The carve yielded, among others, two PDFs and
+six `.chm` help files (see
+[`dvt_legend/protocol.md`](../dvt_legend/protocol.md) for file:line of every
+item):
 
-The full command list, the DataLink output format and the port assignments are
-in documents not available on the open web: **MAN-103 Chapter 5**, Appendices B
-and C, and the **DVT Script Reference Guide (DOC-SCR)**.
+- **UG** — "FrameWork Installation and User Guide for DVT Vision Sensors", 9th
+  ed., June 2007.
+- **SR** — "DVT Script Reference Manual", 5th ed., May 2007.
 
-**Those documents ship inside the Intellect installer's help file.** On Linux:
+Facts quoted from those documents:
 
-```bash
-sudo apt install p7zip-full innoextract libchm-bin
-7z x intellect_installer.exe            # or innoextract
-find . -iname "*.chm" -o -iname "*.pdf" -o -iname "*.htm*"
-extract_chmLib <file>.chm ./help_out
-```
+| Item | Source | What it says |
+|---|---|---|
+| System terminal | UG:2266, :4764 | port **3246** (new systems) / **5000** (older) accepts commands "without using FrameWork" |
+| DataLink output | UG:4660 | user-configured strings sent over TCP to **3247** (new) / **5001** (old); "in some cases, no string will be sent out" |
+| Modbus | UG:4680 | the sensor can be a **Modbus slave on port 502**; the master chooses read or write |
+| VDX output stream | SR:5385 | 64-byte telegrams on **port 7500**, one **after every inspection**, cyclic; one client at a time; enabled by default |
+| Output telegram (camera → client) | SR:5396-5402 | **byte 0:** bit0 Pass, bit1 Warn, bit2 Fail, bit3 Wrong Code (4-7 reserved); **byte 1:** error code (1 product-select failed, 2 save-product error, 3 trigger error); **byte 2:** cycle count; **byte 3:** user bits 1-8; bytes 4-63 script data |
+| Input telegram (client → camera) | SR:5404-5412 | byte 0: bit0 Trigger (acts on the **rising edge**), bit1 Prod. Select, bit2 Relearn, bit3 Save to flash, bit4 Reset, bit5 Trigger mode (0 internal / 1 external), bit6 Run mode; bytes 2-3 product ID |
+| Terminal `#Rs` | help chm 0041:149 | writes Registers — a WRITE, **not used** |
+| Terminal reply codes | help chm 0045 | reply ends `% <code>` then `?` (success) or `!` (error); codes: 0 ok, 1 general error, 2 access denied, 3 out of memory, 4 flash error, 5 network error, 6 invalid parameter, 7 locked |
+
+**Not found in the vendor documents:** the command `#YI` (zero hits in the UG,
+the SR and all six `.chm` files — see section 7.7); the full list of `#`/`*`
+system-terminal commands (the UG defers to "the FrameWork help files", which in
+this installer do not carry the list); any FTP port or procedure (matching the
+closed port 21); and any image-over-Ethernet protocol (image transfer is
+described only as a FrameWork option, UG:2295).
 
 Installers are hosted by Cognex:
 [Intellect 1.5.1](https://support.cognex.com/en/downloads/detail/dvt/689/1033),
 [FrameWork 2.8.0](https://support.cognex.com/en/resources/software-firmware/installfwk280/english/pP2fPnDISgejyYU8VWvYNw).
 
-### 7.5 Why Modbus matters
+### 7.5 Modbus TCP: mapped read-only, with a negative result
 
-**Modbus TCP is open on port 502.** That is a published standard, not a
-proprietary protocol, which means:
+**Modbus TCP is open on port 502**, a published standard rather than a
+proprietary protocol, so the register space was mapped read-only with
+`pymodbus` 3.16.1 (`read_*` calls only, unit/device id 1, addresses 0–255 for
+FC1–FC4). Findings (CONFIRMED,
+[`dvt_legend/modbus_map.md`](../dvt_legend/modbus_map.md)):
 
-- Pass/Fail can be read from Linux today with `pymodbus` or `mbpoll`
-- The **S7-1200 speaks Modbus TCP natively** through `MB_CLIENT`
+- **Every address 0–255 answers on all four function codes, no exception.** FC1
+  (coils) == FC2 (discrete inputs) and FC3 (holding) == FC4 (input): the camera
+  mirrors them.
+- **Static at idle:** bits 32, 52, 58, 73 = 1; register 2 = 256 (`0x0100`),
+  register 4 = 2; everything else 0.
+- **Free-running:** register 3 and bits 53, 54, 55, 59 cycle about once per
+  second (reg 3 steps `0x1004` → `0x9004` → a burst value → back), in step with
+  the ~1 Hz inspection rate. HYPOTHESIS: a heartbeat / rotating I/O-task status,
+  not a result.
+- **Negative result (CONFIRMED):** no address differed between a baseline read
+  and a part-under-the-lens read, and none changed around a trigger. **No
+  Pass/Fail signal was located in 0–255 on unit 1.** (Not tried: addresses above
+  255, other unit ids.) The documented result channel is instead the VDX output
+  stream on port 7500 (section 7.6).
 
-So the camera can talk **directly to the PLC over Ethernet** with no digital
-I/O wiring, no BOB terminals and no 24 V handshake lines:
+The architecture argument still holds in principle — the **S7-1200 speaks
+Modbus TCP natively** through `MB_CLIENT`, so a camera result could reach the
+PLC over Ethernet with no digital I/O wiring, no BOB terminals and no 24 V
+handshake lines:
 
 ```
 S7-1200 ──[ MB_CLIENT over Ethernet ]──> camera 192.168.10.242:502
 ```
 
-This is a better architecture than the Pass/Fail/Busy wiring originally
-planned, and it would need both devices on the same subnet.
+But on this camera, as currently configured, that path needs a result register
+to be mapped first (via FrameWork), because none was found in the default range.
+Both devices would also have to be on the same subnet.
 
-### 7.6 Wiring, if digital I/O is used instead
+### 7.6 The VDX output stream: the result channel (CONFIRMED)
 
-The Legend has **8 configurable I/O lines**, each one an input or an output.
-**Pin 8 is reserved for strobe illumination**, so use lines 1 to 7.
+Reading port 7500 receive-only (`dvt_result.py`) confirmed the documented
+64-byte telegram live:
+
+- The camera runs **~1 inspection per second** on its own internal trigger.
+- Every telegram is `04 00 NN 00 ...`: byte 0 = `0x04` = the **Fail** bit,
+  byte 1 = 0 (no error), byte 2 = `NN` a **cycle counter** incrementing once per
+  second, bytes 3–63 = 0. So the result is **FAIL on every inspection**, with or
+  without a part under the lens; which product is loaded and why it fails is
+  UNKNOWN without FrameWork.
+- Passive 60 s capture: exactly 60 records of 64 bytes, one per second. With a
+  part under the lens: 57 records, only the counter byte differs — so **the
+  stream does not react to the scene** (CONFIRMED).
+- Ports 3247/5001 emit `1\r\n` once per second (a DataLink string configured as
+  "1" per inspection); a `#YI` on 3246 at t = 40 s produced no change on either.
+  They are heartbeats / keepalives, **not** a result channel.
+
+### 7.7 The system terminal and the `#YI` correction
+
+The system terminal on 3246 takes `#CMD args<CR>`; replies end `% <code>` then
+`?` (success) or `!` (error). An early note (from an IAI integration document,
+not independently verified) treated `#YI` as the inspection trigger, and the
+terminal did answer it `% 1`, `!`.
+
+Reading the recovered reply-code table (section 7.4) corrected this: **`% 1` is
+a general error and `!` is the error prompt**, so `#YI` → `% 1`, `!` is an
+**error, not an accepted trigger**; `#` alone → `% 6` (invalid parameter) and
+`*` → `)06` are errors too. `#YI` appears in none of the vendor files, so
+triggering an inspection from Linux via the terminal is **UNKNOWN**. The
+documented alternative is the VDX **input** telegram (byte 0 bit 0 Trigger, on
+the rising edge, section 7.4) sent to port 7500; it writes control bits and was
+**not tried** (it needs approval). With the internal trigger already producing
+~1 inspection/s, an explicit trigger may be unnecessary.
+
+Discipline point: a device accepting a command string is not the same as the
+command being valid. The reply code has to be read, not assumed.
+
+### 7.8 Image retrieval and the no-lens root cause (CONFIRMED)
+
+With no FTP or HTTP service, image transfer turned out to be available through
+the System terminal's documented image commands (vendor reference
+`Image_Management_Commands.htm` and companions). Read-only decimal-mode queries
+on 3246 (`#CMD args<CR>`, replies are ASCII `# <packet type> <id> ...`):
+
+| Command | Result seen |
+|---|---|
+| `#I` | `FrameWork Version 2.7.4 (Build 14012005)` — the camera's firmware |
+| `#IC` | one **DVT520** sensor, **640×480** |
+| `#PQ` | products: 1 **FMS50**, 2 **train**, 3 **murat** |
+| `#PQ 1` | product 1: exposure **8300**, antiblooming 0, illumination **ON**, gain **128**, full window |
+| `#Ii` | inspection statistics (2037 total at first read, none missed) |
+| `#IQ` | the 8 newest saved image ids (2084..2091, rotating) |
+| `#IS <id> 0 0 639 479 0 1 1 0 0` | the full image as type-16 (header), type-20 (name) and type-18 (data) packets, ending `% 0`, `?` |
+
+A full 640×480 frame (307200 pixels) takes ~21.7 s, limited to ~70 KB/s by the
+camera's terminal rather than by the network; `#Is` with no arguments returns
+only a 1-pixel window.
+
+The first frames were **saturated**: image 2091 had 99.97 % of pixels at 255
+(min 242), a flooded sensor rather than a broken transfer. The exposure was then
+lowered, **operator-authorised and in RAM only**, with the documented
+`#PP 1 E <us>`:
+
+| Exposure (µs) | Image (214×160 window) |
+|---|---|
+| 8300 (original) | 100 % saturated, min 242 |
+| 1000 | min 0, mean 15, max 43 (too dark) |
+| 3000 | min 38, mean 83, max 128, 0 % saturated (good) |
+
+At 3000 µs the image was a **uniform grey with a mild vertical gradient and no
+objects**. The operator then confirmed the **root cause of "no picture": no lens
+is fitted; the sensor is bare.** That explains every observation — the smooth
+illumination gradient with no scene detail, the frame-to-frame difference equal
+to sensor noise, the sharp dark specks that are dust on the cover glass (the only
+thing "in focus" without a lens), and the strobe doubling the brightness
+(mean 83 with strobe vs 40 without). Row-major decoding was verified correct
+(column-major gives obvious banding).
+
+**Conclusion (CONFIRMED):** the Linux image path — `#IS` on port 3246 — works
+**end to end**; it only needs a C/CS-mount lens to show a scene. The camera was
+left with product 1 at exposure 3000 µs, strobe ON, **in RAM only** (a power
+cycle restores the flash value of 8300 µs). Every interaction with the camera in
+this project was **read-only, except the operator-authorised, RAM-only exposure
+change** (logged in `exposure_changes.log`).
+
+### 7.9 Wiring fallback: digital I/O instead of Ethernet
+
+If the Ethernet result path is not used, the Legend has **8 configurable I/O
+lines**, each an input or an output. **Pin 8 is reserved for strobe
+illumination**, so use lines 1 to 7.
 
 | Direction | Camera function | PLC |
 |---|---|---|
@@ -855,10 +1064,11 @@ outputs feeding the PLC, tie each channel's `−` to the PLC `0V`.
 | 1 | Complete AS-i I/O map | Not started. Needs a bus scan plus physical tracing, or the Part C circuit diagram from the Festo binder |
 | 2 | Does the robot's Station 4 interface sit on AS-i or on the old E.IPC local I/O? | Unknown. Decides whether an SM 1223 is needed |
 | 3 | What drives the MICROMASTER 420 digital inputs? | Unknown. Check P0701 to P0703 on the drive keypad before wiring anything |
-| 4 | Robot continuous motion | Diagnosed. Needs the path moved into a controller-resident program |
+| 4 | Robot continuous motion | Diagnosed and **mitigated**: run as a host-side teach-and-repeat cell with per-point speed/I/O and sensor-triggered single passes (section 2.10). A fully *blended* path still needs a controller-resident program |
 | 5 | Serial commands to upload or run a program on the CR1 | Not established. Must be read from the manual or discovered empirically, never guessed |
-| 6 | DVT Modbus register map | Not started. Read-only mapping plus a before/after diff will identify the signals |
-| 7 | DVT protocol documentation | Blocked on extracting the Intellect help file |
+| 6 | DVT Modbus register map | **Mapped read-only** (addresses 0–255, unit 1): no Pass/Fail register found (section 7.5). A result register would have to be configured in FrameWork, or the result read from the VDX stream on port 7500. Not tried: addresses > 255, other unit ids |
+| 7 | DVT protocol documentation | **Recovered** from the FrameWork 2.8.0 installer (section 7.4): VDX telegram format, terminal reply codes and image commands are documented, and image retrieval is confirmed end to end. Still missing: the full `#`/`*` system-terminal command list (not in the carved help files) |
+| 8 | DVT camera has no lens | Root cause of the blank image (section 7.8). Needs a C/CS-mount lens before any inspection is meaningful |
 
 ### 8.1 Recovering the I/O map
 
@@ -903,6 +1113,28 @@ On a 5-axis arm it is a collision.
 **Boot capture finds undocumented devices.** `tcpdump` plus a power cycle
 revealed a camera that no ping sweep could find, because it was on a subnet
 nobody knew about.
+
+**A reply is not an acknowledgement.** The camera "answered" `#YI`, which looked
+like a working trigger until the reply-code table was read and `% 1` turned out
+to mean *general error*. Read the status code, do not infer success from the
+fact that the device replied at all.
+
+**Unpack, do not run, an untrusted installer.** The FrameWork protocol was
+recovered by carving the Wise overlay's raw-deflate streams out of the installer
+offline; nothing from the vendor binary was executed. The documents needed were
+inside it.
+
+**A documented channel beats a guessed register map.** Mapping Modbus 0–255
+read-only found no Pass/Fail bit; the result actually lives in the documented
+VDX stream on port 7500. Time spent diffing registers would have been wasted.
+
+**Confirm the optical path before chasing a software bug.** Days of "no picture"
+were, in the end, a missing lens. The transfer, decode and exposure control were
+all working; the sensor was simply bare. Check the physics first.
+
+**Stay read-only on someone else's device.** Every probe of the camera was
+read-only except one operator-authorised, RAM-only exposure change that a power
+cycle reverts. Nothing was written to flash, and no control bit was asserted.
 
 **The two terminals.** `1M` on the input side and `3L+`/`3M` on the output
 side account for most first-day failures on an S7-1200. Both produce symptoms
