@@ -11,7 +11,9 @@ assistant and how its model was fine-tuned, the transfer-line integration, all t
 day-to-day operation, troubleshooting, safety rules, known issues and the project history.
 
 > Last updated: 2026-10-21. (See [§19 Project history](#19-project-history) for the October 2026 work:
-> per-point speed, per-point I/O actions, continuous-motion fixes, the GUI overhaul, and the
+> per-point speed, per-point I/O actions, continuous-motion fixes, the GUI overhaul, the
+> **sensor-triggered auto-run** (a TCP-mounted part sensor starts one assembly pass per part),
+> a new home pose at the pick/wait position, the always-fullscreen panel, and the
 > DVT Legend 510MR and stereo-camera investigations.)
 
 ---
@@ -351,14 +353,20 @@ Rule everywhere: a joint already outside its range may stay or move back in, nev
 ### 5.3 Home pose
 
 The operator's home (controller readings), saved in `rv2aj.yaml` (sequencer and AI), the node
-defaults and the SRDF group state `home`:
+defaults and the SRDF group state `home`. It was moved on 2026-10-21 to the pick/wait position
+next to the parts, where the TCP-mounted part sensor reads — this is the pose the sensor-triggered
+auto-run (§8.1) parks at and re-arms from. It coincides with the taught point **P2E**:
 
 | J1 | J2 | J3 | J4 | J5 | J6 |
 |---|---|---|---|---|---|
-| −118.49 | −101.71 | 186.64 | — | −127.75 | −279.42 |
+| −217.26 | −97.21 | 219.75 | — | −164.49 | −350.46 |
+
+(Superseded: the earlier home was −118.49 / −101.71 / 186.64 / — / −127.75 / −279.42.)
 
 Old points taught before the origin reset were backed up to
 `~/.ros/rv2aj_points_before_origin_reset_2026-09-28.json` and cleared; re-teach the points you need.
+Current taught points are snapshotted into `points_backups/<timestamp>/` (the live file,
+`~/.ros/rv2aj_points.json`, is outside the repo).
 
 ### 5.4 Table and gripper in the model
 
@@ -407,7 +415,7 @@ colcon build && source install/setup.bash
 | **driver** | Owns the serial port. Polls JPOSF every cycle (~0.1 s per query), STATE+PPOSF every 1 s (0.5 s while moving) and the line I/O bytes. Executes moves, gripper, outputs, servo, override. Publishes `status` and `joint_states`. Uses the simulated controller (`fake_link`) when `use_fake_hardware` is true. |
 | **planner** | MoveIt-validated motion in front of the driver: `planned/tcp_move`, `planned/joint_move`; also MoveIt's trajectory controller (RViz "Plan & Execute"). |
 | **jog** | RViz interactive marker (X/Y/Z arrows at the TCP): drag and release makes one straight, validated move. |
-| **sequencer** | Teach points, loop playback, home. |
+| **sequencer** | Teach points (name, joints, gripper, per-point speed, per-point outputs), loop playback, home, and sensor-triggered auto-run (§8.1). |
 | **translator** | Simple English voice/text phrases → commands ("move up 20", "go to point 2", "stop"). |
 | **voice** | Legacy microphone → Google speech recognition → `voice/text` (off by default; the start script launches with `voice:=false`). |
 | **ai** | The AI assistant (section 9). |
@@ -447,7 +455,11 @@ variables stripped (VS Code snap terminals crash PyQt otherwise).
 `gripper/close`, `line/set` (LineSignal: signal ready|busy|error_code|sim_order, value).
 
 **Services (sequencer)**: `points/save` (SavePoint), `points/delete`, `points/goto` (PointName),
-`points/clear`, `loop/start`, `loop/stop`, `home/goto`.
+`points/clear`, `points/set_speed` (SetPointSpeed: point, percent), `points/set_io`
+(SetPointIO: point, outputs[], values[]), `loop/start`, `loop/stop`, `loop/auto`
+(SetAutoRun: enable, input_bit — arm/disarm the sensor-triggered auto-run, §8.1), `home/goto`.
+`SequencerStatus` (latched) carries, besides the point list and loop state,
+`auto_mode` / `pending_parts` / `auto_input_bit`.
 
 **Services (ai)**: `ai/confirm`, `ai/cancel`. **Voice**: `voice/enable` (SetBool).
 
@@ -487,7 +499,9 @@ ros2 topic pub --once /rv2aj/ai/request std_msgs/String "{data: '3 santim yukar�
 - **planner**: check_step_deg 1, line_step_mm 5, line_tolerance_mm 1, planning_time_s 5, move caps.
 - **translator**: require_keyword, default/max distance.
 - **sequencer**: points_file, **home_joints_deg**, **home_speed_percent** 40 (Home's speed for the
-  slowest-of-two rule; Home has no taught speed of its own), gripper_wait_s 0.6.
+  slowest-of-two rule; Home has no taught speed of its own), gripper_wait_s 0.6,
+  **auto_input_bit** 1 (the TCP part sensor, IN1; §8.1), **auto_start_point** `P2E` (the point the
+  arm parks at / where the sensor reads — an auto pass starts at the *next* point and does not wrap).
 - **ai**: model `rv2aj-qwen`, ollama_url, k_examples, **confirm_mode** (`guesses`|`all`), plan_ttl_s 120,
   speak, tts `piper`, voice_tr/voice_en, language `tr`, voice_style `plain`, sounds, memory/log files,
   **joint_limits_deg**, home fallback.
@@ -525,7 +539,8 @@ The controller's own override reads 100 %; programs run from the pendant would u
 
 ## 8. The control panel (GUI)
 
-Header: connection state, servo, alarm pills; port box; Connect/Disconnect; **STOP**.
+The panel opens **fullscreen** (operator's choice, 2026-10-21); **F11** toggles between fullscreen
+and a normal window. Header: connection state, servo, alarm pills; port box; Connect/Disconnect; **STOP**.
 
 | Area | What it does |
 |---|---|
@@ -534,7 +549,7 @@ Header: connection state, servo, alarm pills; port box; Connect/Disconnect; **ST
 | **Gripper** | OPEN / CLOSE, last commanded state, 160 N warning. |
 | **Robot IO · İstasyon 4** | live LEDs for every I/O group in use (survey 2026-10-16, `io_survey_2026-10-16.txt`): IN0–7, IN8–15, OUT0–7, OUT8–15, hand inputs 900–907 (EL G) and hand outputs 900–907 (EL Ç; the pneumatic valves, 900/901 = gripper hand 1). Every output is clickable (driver `line/set` signal `out<n>`, n = 0–15 or 900–907; one bit written, its byte read back). Current order from IN7/IN6, Hazır/Meşgul toggles, error code 0–3, and "Genel çıkışları sıfırla" (OUT0–15 only; hand valves are left alone so cylinders don't jump). The extra bytes are polled only while the arm is idle. At the survey: IN4, IN9, IN11, IN13, IN15 on; hand outputs 901, 902, 904, 906 on (one side of each valve pair). **"📍 Tıklananı seçili noktaya kaydet"** (operator's choice, 2026-10-20): while checked, clicking an output also records it (output + value) against the selected point, same slot as the gripper — set automatically after the robot arrives there. |
 | **Motion** | Servo ON/OFF, speed override slider, joint step size, Home, Reset alarm. |
-| **Points & Loop** | Save point, **Insert after** (teach a point between two existing ones), Go to, Delete, Clear, table of points (joints, gripper, **speed %**), Start/End loop. **Slow (10%) / Fast (40%)** set the selected point's own speed override (operator's choice, 2026-10-20; see below). A summary line shows the selected point's recorded IO actions with a **"Çıkışları temizle"** button to remove them all. |
+| **Points & Loop** | Save point, **Insert after** (teach a point between two existing ones), Go to, Delete, Clear, table of points (joints, gripper, **speed %**), Start/End loop. **Slow (10%) / Fast (40%)** set the selected point's own speed override (operator's choice, 2026-10-20; see below). A summary line shows the selected point's recorded IO actions with a **"Çıkışları temizle"** button to remove them all. **"▶ Oto-çalışma (TCP sensörü)"** arms/disarms the sensor-triggered auto-run (§8.1); it is shown armed/running, asks for confirmation when armed, and needs the servo on and ≥1 point. |
 | **Event log** | everything the stack does. |
 | **Yapay Zekâ Kontrolü** | the AI chat (section 9.7). |
 
@@ -542,6 +557,30 @@ Header: connection state, servo, alarm pills; port box; Connect/Disconnect; **ST
 - **`+`** (main or numpad): emergency stop, always — even while typing in a field (so "+" cannot be typed in the chat).
 - **Esc**: stop.
 - **Hold `S`**: push-to-talk (not while typing in a text field; releasing or leaving the window sends).
+- **F11**: toggle fullscreen / normal window.
+
+### 8.1 Sensor-triggered auto-run
+
+A part sensor is mounted on the robot's TCP and wired to input **IN1** (`auto_input_bit`). Because the
+sensor rides with the arm, a reading is only meaningful when the arm is parked where parts arrive — so
+the auto-run is deliberately gated on the arm being *at home*:
+
+- When auto-run is armed (`loop/auto`, SetAutoRun) and the arm is **idle, parked at home** (every fitted
+  joint within `AUTO_HOME_TOL_DEG` = 10° of `home_joints_deg`) **and the sensor sees a part**, the
+  sequencer runs **one full pass** through the taught points, then returns to home and waits for the next part.
+- Home coincides with the taught point **P2E** (`auto_start_point`), where the sensor reads, so a pass
+  **starts at the point after P2E** and runs to the last point — it does not restart from the top or wrap
+  into a continuous loop. If `auto_start_point` is not found it falls back to starting at the first point.
+- The trigger is the **rising edge** of *(idle ∧ at-home ∧ sensor)*. The arm leaves home during the pass,
+  so sensor readings taken mid-pass (the sensor moving through the air near the stations) are **ignored**;
+  returning home naturally re-arms it for the next part. Queued parts are therefore handled one pass at a
+  time without any explicit queue.
+- **Safety**: the servo is only ever enabled by a human (auto-run never enables it); arming requires the
+  servo on and at least one taught point; and **STOP disarms** auto-run (clears `auto_mode`). On restart
+  the auto-run starts disarmed.
+
+If home is later moved to a different taught point, set `auto_start_point` to that point's name so the
+pass still starts at the point after it.
 
 ---
 
@@ -892,8 +931,9 @@ systemctl --user status rv2aj-stack.scope rv2aj-ollama
 9. Remaining AI weak spots: "wave three times" runs once, "bileği düzelt" nudges instead of straightening,
    "move the shoulder ninety degrees" becomes an absolute move. A second, shorter training round aimed at these
    would fix them.
-10. The home pose with J6 −72.67 is saved in all files; after saving it, rebuild and restart once:
-    `colcon build --packages-select rv2aj_control rv2aj_moveit_config`, then `./stop_robot.sh && ./start_robot.sh norviz`.
+10. After changing `home_joints_deg` (or `auto_start_point`) in `rv2aj.yaml`, rebuild and restart once so the
+    sequencer and AI pick it up: `colcon build --packages-select rv2aj_control rv2aj_moveit_config`, then
+    `./stop_robot.sh && ./start_robot.sh norviz`. The current home (2026-10-21) is at the pick/wait pose = P2E (§5.3).
 
 ### Roadmap (agreed development ideas, not built yet)
 
@@ -930,3 +970,4 @@ systemctl --user status rv2aj-stack.scope rv2aj-ollama
 | 2026-10-16 | Full **station I/O panel** in the GUI (all IN/OUT groups incl. pneumatics 900–907); every output clickable; controller MEJAR found wide open, J3 soft limit opened to 210°; driver now logs the alarm number + text |
 | 2026-10-19/20 | **Per-point speed** (Slow/Fast, slowest-of-two rule) and **per-point I/O actions** (set outputs on arrival, same slot as the gripper); teach-point backups with speeds/I/O; **GUI overhaul** — scroll-area layout so cards never overlap, removed unrenderable emoji glyphs, Insert-after and two-row point controls |
 | 2026-10-20/21 | **Continuous-motion fixes**: removed the per-point I/O-poll stall, the redundant gripper re-command + 0.6 s wait when the gripper is unchanged, and the redundant speed re-send — cutting inter-point dead time from ~1.4 s to ~0.4 s (the physical deceleration at each point remains; CNT blending is not available on this controller); this repository published |
+| 2026-10-21 | **Sensor-triggered auto-run** (§8.1): a TCP-mounted part sensor on IN1 starts one assembly pass per part, gated on the arm being parked at home (within 10°) so TCP-sensor readings are trusted only there; the pass starts at the point **after** the sensor point (P2E), runs to the end and returns home to re-arm, ignoring mid-air readings (`SetAutoRun`, `auto_start_point`). **New home** moved to the pick/wait pose next to the parts (= P2E). **Always-fullscreen** panel (F11 toggles). Higher-I/O poll refined (all bytes when settled, round-robin mid-loop). Current 47-point set (with per-point speed/I/O) backed up into `points_backups/` and pushed |
