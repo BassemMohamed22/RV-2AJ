@@ -22,26 +22,26 @@ day-to-day operation, troubleshooting, safety rules, known issues and the projec
 full taught sequence (per-point speeds and gripper/I/O actions) executed by the robot over RS-232
 (sped up ~19×; the full video runs about 4.5 minutes):
 
-![RV-2AJ real assembly](docs/images/real_robot_assembly.gif)
+<img src="docs/images/real_robot_assembly.gif" width="100%" alt="RV-2AJ real assembly">
 
 **The same stack in simulation / RViz** — the arm driven through a joint sweep in the ROS 2 +
 MoveIt stack in simulation mode (`./start_robot.sh sim`); without `sim` it drives the real robot:
 
-![RV-2AJ moving in RViz](docs/images/rviz_sim_motion.gif)
+<img src="docs/images/rviz_sim_motion.gif" width="100%" alt="RV-2AJ moving in RViz">
 
 **The operator control panel** (`gui_node.py`, started with `./start_robot.sh`) — live joints,
 TCP pose, Motion (servo / speed / joint step / home), Points & Loop with the per-point
 **Slow/Fast** speed buttons, the Gripper card, the full **Station I/O** panel (IN/OUT groups
 including the pneumatics), and the offline Turkish **AI assistant** on the right:
 
-![RV-2AJ control panel](docs/images/gui_control_panel.png)
+<img src="docs/images/gui_control_panel.png" width="100%" alt="RV-2AJ control panel">
 
 **DVT Legend 510MR, exposure control over the Ethernet terminal** (`dvt_legend/`) — the camera's
 inspection product was saturating (all-white frames); dropping the exposure over the recovered
 terminal protocol (`#PP 1 E <us>`) brought the sensor back into range. The remaining uniform grey
 is because no lens is fitted — see [`dvt_legend/findings.md`](dvt_legend/findings.md):
 
-![DVT exposure before and after](docs/images/dvt_exposure_before_after.png)
+<img src="docs/images/dvt_exposure_before_after.png" width="100%" alt="DVT exposure before and after">
 
 > More images (the live robot and cell, loops running, the cameras in use) are best captured on
 > the hardware — drop them in `docs/images/` and reference them here.
